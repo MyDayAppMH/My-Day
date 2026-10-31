@@ -5,7 +5,7 @@ A small personal app for an Android phone with two jobs:
 - **Day ahead:** your meetings (from Google Calendar) with a brief for each one, who you are meeting (from your Notion CRM), and your to-dos (from your Notion Task Database). Tick a task off and it is marked Done in Notion.
 - **Review:** log the day, usually next morning: mood, energy, what it was about, what happened. History shows mood over time and simple patterns against sleep, sport and steps.
 
-It does not have a server of its own. It talks to the **Worker from the Calorie tracker repo** (`worker/` there), which already holds the Google connection and now also talks to Notion. Both apps share one Worker address and one app key.
+It does not have a server of its own. It talks to the **Worker from the Calorie tracker repo** (`worker/` there), which already holds the Google connection and now also talks to Notion. Both apps share one Worker address and one app key. This app lives in its own GitHub organisation (`MyDayAppMH`), so the Worker's `ALLOWED_ORIGIN` lists both web addresses.
 
 | Part | Where it lives |
 |---|---|
@@ -32,8 +32,8 @@ It does not have a server of its own. It talks to the **Worker from the Calorie 
    `NOTION_TASKS_DB` and `NOTION_PEOPLE_DB` are already in `wrangler.toml`.
 
 ### 3. Install and connect
-1. Open `https://caloriesin-n-out.github.io/My-Day/` in Chrome, reload twice, then **⋮ → Install app**.
-2. Open the app → **Settings**. Tap **Copy from Calorie tracker** (works when both are opened in the same Chrome), or paste the Worker address and app key. **Save**, then **Check connection**.
+1. Open `https://mydayappmh.github.io/My-Day/` in Chrome, reload twice, then **⋮ → Install app**.
+2. Open the app → **Settings**. Paste the Worker address (`https://calorie-tracker.matthias-homan.workers.dev`) and the same app key you use in Calorie tracker. **Save**, then **Check connection**.
 
 ## Using it
 - **Day ahead:** next meeting is highlighted; tap a meeting for time, where, join link, who is invited (✓ yes, ? maybe, ✗ no, · no reply), the description, **From your CRM** (role, company, last contact, history summary, open tasks, a button to add a task for that person) and a private prep-notes box.
