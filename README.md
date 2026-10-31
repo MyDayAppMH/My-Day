@@ -19,7 +19,7 @@ It does not have a server of its own. It talks to the **Worker from the Calorie 
 ### 1. Google: switch on Calendar
 1. <https://console.cloud.google.com> → your project → **APIs & Services → Library** → "Google Calendar API" → **Enable**.
 2. **Data Access** (or "Scopes") → add `https://www.googleapis.com/auth/calendar.readonly` → Save.
-3. In **Calorie tracker or My Day → Settings → Connect Google**, sign in again and approve calendar access. (Google asks again because the permission list grew.) Settings → *Check connection* should then say "Calendar permission: granted".
+3. In **My Day → Settings → Connect Google Calendar**, sign in and approve. Calendar has its own Google login, separate from Google Health: the Health API refuses any login that also carries a calendar permission, so the two are never combined. Health stays connected from **Calorie tracker → Settings → Connect Google Health**. *Check connection* should then list Calendar, Health and Notion as connected.
 
 ### 2. Notion: let the Worker read your tasks and CRM
 1. Notion → *Settings → Connections → Develop or manage integrations* → use the integration you already have for Pocket CRM, or create an **internal** one with *Read content*, *Update content* and *Insert content*.

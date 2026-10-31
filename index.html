@@ -486,14 +486,14 @@ function settingsHtml() {
   const row = (label, s) => s ? `<div class="${s.ok ? 'okbox' : 'errbox'}"><b>${label}</b> ${fmtAt(s.at)}: ${s.ok ? 'OK' : ''}${s.message ? '<br>' + esc(s.message).replace(/\n/g, '<br>') : ''}</div>` : '';
   return `<div class="topbar"><h2 style="margin:0;font-size:20px">Settings</h2></div><div class="stack set">
     <div class="card"><h3>Connection</h3>
-      <p class="muted">Uses the same Worker as Calorie tracker. Calendar, tasks and health data all come through it.</p>
+      <p class="muted">Uses the same Worker as Calorie tracker. Calendar and tasks come through it. Sleep and heart-rate figures use the Google Health connection you made in Calorie tracker.</p>
       <label class="lbl2" for="baseUrl">Worker address</label>
       <input class="field" id="baseUrl" inputmode="url" autocapitalize="off" value="${esc(S.settings.baseUrl)}" placeholder="https://calorie-tracker.yourname.workers.dev">
       <label class="lbl2" for="appKey">App key</label>
       <input class="field" id="appKey" type="password" autocomplete="off" value="${esc(S.settings.appKey)}" placeholder="paste your app key">
       <div class="row" style="margin-top:12px;flex-wrap:wrap">
         <button class="btn day" data-act="save-conn">Save</button>
-        <button class="btn ghost" data-act="connect">Connect Google</button>
+        <button class="btn ghost" data-act="connect">Connect Google Calendar</button>
         <button class="btn ghost" data-act="check">Check connection</button>
         <button class="btn ghost" data-act="sync-all">Refresh everything</button>
       </div>
@@ -688,17 +688,18 @@ async function act(a) {
   else if (a === 'connect') {
     saveConn(); const base = baseUrl();
     if (base === null) return toast('Enter the Worker address first.');
-    window.open(base + '/auth/start', '_blank');
+    window.open(base + '/auth/start?service=calendar', '_blank');
   }
   else if (a === 'check') {
     saveConn();
     const out = $('checkOut'); out.innerHTML = '<p class="muted">Checking…</p>';
     try {
-      const r = await api('/api/status'), cal = /calendar/.test(r.scopes || '');
-      const lines = [r.connected ? 'Worker reachable, Google connected.' : 'Worker reachable, but Google is not connected yet. Tap “Connect Google”.',
-        r.connected ? (cal ? 'Calendar permission: granted.' : 'Calendar permission: <b>not granted yet</b>. Tap “Connect Google” and approve calendar access.') : '',
-        r.notion ? 'Notion: set up on the Worker.' : 'Notion: <b>not set up</b> on the Worker yet.'].filter(Boolean);
-      out.innerHTML = `<div class="${r.connected && cal && r.notion ? 'okbox' : 'errbox'}">${lines.join('<br>')}</div>`;
+      const r = await api('/api/status');
+      const lines = ['Worker reachable.',
+        r.calendarConnected ? 'Google Calendar: connected.' : 'Google Calendar: <b>not connected yet</b>. Tap “Connect Google Calendar”.',
+        r.connected ? 'Google Health (sleep, steps): connected.' : 'Google Health: <b>not connected</b>. Open Calorie tracker → Settings → Connect Google Health.',
+        r.notion ? 'Notion: set up on the Worker.' : 'Notion: <b>not set up</b> on the Worker yet.'];
+      out.innerHTML = `<div class="${r.calendarConnected && r.connected && r.notion ? 'okbox' : 'errbox'}">${lines.join('<br>')}</div>`;
     } catch (e) { out.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; }
   }
   else if (a === 'sync-all') { saveConn(); await syncHealth(30); loadDay(view === 'review' ? reviewDate : viewDate); }
