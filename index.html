@@ -181,7 +181,7 @@ svg text { fill: var(--muted); font-size: 10px; font-family: inherit; }
 
 <script>
 'use strict';
-const BUILD = '2026-11-02.3';
+const BUILD = '2026-11-02.4';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -239,7 +239,15 @@ function save() {
 let S = load();
 let view = 'today';
 let viewDate = today();
-let reviewDate = new Date().getHours() < 12 ? addDays(today(), -1) : today(); // mornings default to logging yesterday
+let reviewDate = addDays(today(), -1); // the review is about the previous day, so the steps and calendar are complete
+let lastToday = today();
+// A phone app can stay open past midnight: move "today" along so the Day tab does not keep showing yesterday.
+function rollDay() {
+  const t = today();
+  if (t === lastToday) return false;
+  if (viewDate === lastToday) { viewDate = t; didScroll = false; }
+  lastToday = t; return true;
+}
 let histDays = 30, mailFilter = 'all', loading = false, didScroll = false;
 
 function applyTheme() {
@@ -334,6 +342,7 @@ function render() {
   }
 }
 function go(v) {
+  if (v === 'review' && view !== 'review') reviewDate = addDays(today(), -1); // each visit starts on the previous day; use › for today
   view = v; render(); window.scrollTo(0, 0);
   if (v === 'review') loadDay(reviewDate);
   if (v === 'today') loadDay(viewDate);
@@ -548,7 +557,7 @@ function dateBar(date, prevAct, nextAct) {
 function factsHtml(date) {
   const c = S.cache[date], done = (S.tasks && S.tasks.doneOn[date]) || [], h = S.health[date] || {};
   const timed = c ? c.events.filter(e => !e.allDay) : [];
-  const hb = [h.steps != null && `${fmt(h.steps)} steps`, h.sleepMinutes != null && `slept ${dur(h.sleepMinutes)}`, h.caloriesOut != null && `${fmt(h.caloriesOut)} kcal burned`, h.restingHr != null && `resting HR ${Math.round(h.restingHr)}`].filter(Boolean);
+  const hb = [h.steps != null && `${fmt(h.steps)} steps`, h.sleepMinutes != null && `slept ${dur(h.sleepMinutes)} the night before`, h.caloriesOut != null && `${fmt(h.caloriesOut)} kcal burned`, h.restingHr != null && `resting HR ${Math.round(h.restingHr)}`].filter(Boolean);
   if (!timed.length && !done.length && !hb.length) return '';
   return `<div class="card facts"><h3>What the day looked like</h3>
     ${timed.length ? `<div class="muted" style="font-size:13px">Meetings</div><ul>${timed.map(e => `<li>${timeStr(e.start)} ${esc(e.title)}</li>`).join('')}</ul>` : ''}
@@ -1020,12 +1029,15 @@ if (connected()) {
   if (!Object.keys(S.health).length) syncHealth(30); else if (Date.now() - S.healthAt > 30 * 60 * 1000) syncHealth(7);
 }
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState !== 'visible' || !connected() || $('overlay').innerHTML) return;
+  if (document.visibilityState !== 'visible') return;
+  const rolled = rollDay();
+  if (rolled && !$('overlay').innerHTML) { render(); if (connected()) loadDay(viewDate); }
+  if (!connected() || $('overlay').innerHTML) return;
   const d = view === 'review' ? reviewDate : viewDate, c = S.cache[d];
   if ((view === 'today' || view === 'review') && (!c || Date.now() - c.at > 5 * 60 * 1000)) loadDay(d);
   if (view === 'inbox' && (!S.inbox || Date.now() - S.inbox.at > 5 * 60 * 1000)) loadInbox();
 });
-setInterval(() => { if (view === 'today' && viewDate === today() && !$('overlay').innerHTML && !document.hidden) render(); }, 60 * 1000); // keeps the now-line and "next" label current
+setInterval(() => { if (rollDay() && connected() && !$('overlay').innerHTML) loadDay(viewDate); if (view === 'today' && viewDate === today() && !$('overlay').innerHTML && !document.hidden) render(); }, 60 * 1000); // keeps the now-line and "next" label current
 </script>
 </body>
 </html>
