@@ -32,11 +32,12 @@
     <li><strong>Gmail:</strong> read-only access to your unread inbox (sender, subject, a short preview) and to recent mail with people you are meeting. It cannot send, delete or change mail. Opening a mail happens in Gmail itself.</li>
     <li><strong>Google Health:</strong> read-only access to daily steps, calories burned, sleep and heart-rate figures, used to show how you slept and how active you were.</li>
     <li><strong>Notion:</strong> it reads your task database and, for the people in a meeting or an email, your contact records. It can mark tasks done, add tasks you create, and create a meeting note in your Meetings database. It does nothing else in Notion.</li>
+    <li><strong>CoinMarketCap:</strong> if you use the Portfolio, the app asks CoinMarketCap (through the server program) for the current price of the coins you list. The coin identifiers are sent for that request. The amounts you hold are never sent anywhere; they stay on your phone.</li>
   </ul>
 
   <h2>Where information is kept</h2>
   <ul>
-    <li><strong>Your daily reviews</strong> (mood, energy, notes) and meeting prep notes are stored only in your phone's browser storage. They are never sent to a server.</li>
+    <li><strong>Your daily reviews</strong> (mood, energy, notes), meeting prep notes and portfolio amounts are stored only in your phone's browser storage. They are never sent to a server.</li>
     <li><strong>Calendar, task, mail and health data</strong> is fetched on request by a small server program (a Cloudflare Worker) that you or the app owner control, and passed to the app on your phone. The app keeps a recent copy on your phone (including subjects and previews of your latest unread mail) so it can show them without a connection. Clearing the site's data in your browser removes it.</li>
     <li><strong>Access tokens</strong> for Google and Notion are stored in that same private Cloudflare account. The server is protected by a secret key, so only the app owner's phone can use it.</li>
   </ul>

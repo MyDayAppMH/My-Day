@@ -5,6 +5,7 @@ A small personal app for an Android phone. One screen for the day, plus a review
 - **Day:** a week strip, then your to-dos and a timeline of the day with meetings and timed tasks. Tap a meeting for a brief: who is invited, the description, **who they are in your Notion CRM**, recent email with them, and your private prep notes. Tap an empty slot or the **+** button to add an event, a task or a meeting note.
 - **Inbox:** your unread mail from the main (Primary) inbox, newest first, with sender, subject and a preview. Social (LinkedIn and similar), promotions, updates and forums are left out. Mail from people in your CRM is marked. Tap a mail to open it in Gmail, or **+ Task** to turn it into a Notion task linked to the sender.
 - **Review:** log the day, usually next morning: mood, energy, what it was about, what happened. History shows mood over time and simple patterns against sleep, sport and steps.
+- **Portfolio** (under More): your crypto holdings with live prices from CoinMarketCap, like the CoinMarketCap app: price and 24 h change per coin, value, amount, and a total. **Hide amounts** blanks the numbers on screen. The amounts you hold are typed or pasted into the app and stay on your phone; only prices come from CoinMarketCap.
 - **More:** start a **new meeting note** in your Notion Meetings database, open the Meetings and Task databases in Notion, History and Settings.
 
 It has no server of its own. It talks to the **Worker from the Calorie tracker repo** (`worker/` there), which holds the Google connections and the Notion token. Both apps share one Worker address and one app key. This app lives in its own GitHub organisation (`MyDayAppMH`), so the Worker's `ALLOWED_ORIGIN` lists both web addresses.
@@ -12,7 +13,7 @@ It has no server of its own. It talks to the **Worker from the Calorie tracker r
 | Part | Where it lives |
 |---|---|
 | The app (`index.html`, `manifest.webmanifest`, `sw.js`, icons) | GitHub Pages, this repo, `main` / root |
-| Worker (`/api/calendar`, `/api/calendar/add`, `/api/mail/*`, `/api/tasks`, `/api/brief`, `/api/meetings/new`, `/api/days`) | Cloudflare, deployed from the Calorie tracker repo |
+| Worker (`/api/calendar`, `/api/calendar/add`, `/api/mail/*`, `/api/tasks`, `/api/brief`, `/api/meetings/new`, `/api/crypto/*`, `/api/days`) | Cloudflare, deployed from the Calorie tracker repo |
 
 **No personal data is stored in this repo.** Reviews and notes live in the phone's browser storage, along with a recent copy of your calendar, tasks and unread-mail list so the app opens fast.
 
@@ -40,7 +41,15 @@ It has no server of its own. It talks to the **Worker from the Calorie tracker r
    ```
    `NOTION_TASKS_DB`, `NOTION_PEOPLE_DB` and `NOTION_MEETINGS_DB` are already in `wrangler.toml`.
 
-### 3. Install and connect
+### 3. CoinMarketCap prices (for the Portfolio, optional)
+1. Make a free account at <https://pro.coinmarketcap.com> and copy your API key from the dashboard (the free Basic plan is enough: the app asks at most about once a minute while the Portfolio is open).
+2. In a Terminal, from the `worker` folder of the Calorie tracker repo (type the key there, never in chat):
+   ```bash
+   npx wrangler secret put CMC_API_KEY
+   ```
+3. In **More → Portfolio**, tap **Paste a list** (one coin per line, like `HYPE 169.5`) or **+ Add coin**. A ticker can belong to several coins, so the app shows the candidates, best-ranked first, and you pick.
+
+### 4. Install and connect
 1. Open `https://mydayappmh.github.io/My-Day/` in Chrome, reload twice, then **⋮ → Install app**.
 2. **Settings:** paste the Worker address (`https://calorie-tracker.matthias-homan.workers.dev`) and the same app key you use in Calorie tracker. **Save**, then **Check connection**. You want Calendar and Gmail connected (including adding events), Health connected, Notion and the Meetings database set up.
 3. **Refresh everything**, then open **Day**.
@@ -50,6 +59,7 @@ It has no server of its own. It talks to the **Worker from the Calorie tracker r
 - **To-dos** are in a collapsible card: overdue and due today first, the rest under "more". Tasks with a due *time* also appear on the timeline. Tick a task and it is marked Done in Notion, with Undo. Backlog and Done are left out, like your Notion views.
 - **Add:** the **+** button offers New event, New task and New meeting note. Tapping an empty slot on the timeline starts an event at that time. An event with guests sends them an invitation; one without guests emails nobody. A task's sheet has **Block time**, which prefills an event.
 - **Meeting notes:** from a meeting's sheet, **New meeting note** creates a page in your Notion Meetings database with the meeting's name, date and time, and the attendees who are in your CRM, then offers **Open in Notion**. From the **+** menu or **More** it creates a blank note for now.
+- **Portfolio:** tap a coin to change the amount or remove it. If a price looks wrong, it is probably the wrong coin for that ticker: remove it and add the right one. Your amounts are in the backup file too, so keep that file private.
 - **Inbox filters:** All, From CRM, Starred, Last 2 days.
 - **Review:** the date defaults to yesterday before noon. Everything saves as you type. "Add meetings and tasks to my notes" pastes that day's meetings and completed tasks into your text.
 - **Settings → Theme:** Dark (default), Light, or Match phone. **Export backup** saves reviews and prep notes; do this before changing the app's web address.

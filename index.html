@@ -161,6 +161,15 @@ textarea.field { min-height: 92px; resize: vertical; }
 .kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 15px; }
 .kv .k { color: var(--muted); }
 svg text { fill: var(--muted); font-size: 10px; font-family: inherit; }
+.prow { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 8px; align-items: center; width: 100%; text-align: left; background: none; border: 0; border-top: 1px solid var(--line); padding: 11px 2px; }
+.prow:first-of-type { border-top: 0; }
+.prow .r { text-align: right; }
+.prow .sym { font-weight: 600; }
+.prow small { display: block; font-size: 12px; color: var(--muted); }
+.up { color: var(--good); } .down { color: var(--danger); }
+.tot { font-size: 32px; font-weight: 600; letter-spacing: -.5px; }
+.pline { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 0 2px; margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.pline b { color: var(--ink); font-weight: 500; }
 .back { border: 0; background: none; color: var(--muted); font-size: 14px; padding: 4px 0; }
 
 .set h3 { margin: 0 0 8px; font-size: 15px; }
@@ -181,7 +190,7 @@ svg text { fill: var(--muted); font-size: 10px; font-family: inherit; }
 
 <script>
 'use strict';
-const BUILD = '2026-11-02.4';
+const BUILD = '2026-11-02.5';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -227,7 +236,7 @@ function mailTime(ms) {
 }
 
 /* ---------- state ---------- */
-function blank() { return { reviews: {}, prep: {}, health: {}, cache: {}, tasks: null, inbox: null, tags: [], settings: { baseUrl: '', appKey: '', theme: 'dark' }, status: {}, healthAt: 0, demo: false }; }
+function blank() { return { reviews: {}, prep: {}, health: {}, cache: {}, tasks: null, inbox: null, tags: [], crypto: { holdings: [], quotes: {}, at: 0 }, settings: { baseUrl: '', appKey: '', theme: 'dark', hideBalances: false }, status: {}, healthAt: 0, demo: false }; }
 function load() {
   try { const o = JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); const s = Object.assign(blank(), o); s.settings = Object.assign(blank().settings, o.settings); return s; }
   catch { return blank(); }
@@ -329,12 +338,12 @@ function dayShape(events, date) {
 /* ---------- rendering ---------- */
 const NAV = [['today', 'Day', '▦'], ['inbox', 'Inbox', '✉'], ['review', 'Review', '☺'], ['more', 'More', '≡']];
 function render() {
-  const active = { history: 'more', settings: 'more' }[view] || view, unread = S.inbox ? S.inbox.unread : 0;
+  const active = { history: 'more', settings: 'more', portfolio: 'more' }[view] || view, unread = S.inbox ? S.inbox.unread : 0;
   $('nav').innerHTML = NAV.map(([k, l, ic]) => `<button data-v="${k}" class="${active === k ? 'on' : ''}"><i>${ic}</i>${l}${k === 'inbox' && unread ? `<span class="nb">${unread > 99 ? '99+' : unread}</span>` : ''}</button>`).join('');
   $('nav').querySelectorAll('button').forEach(b => b.onclick = () => go(b.dataset.v));
   $('fabslot').innerHTML = view === 'today' ? '<button class="fab" data-act="fab" aria-label="Add">+</button>' : '';
   const app = $('app');
-  app.innerHTML = { today: dayHtml, inbox: inboxHtml, review: reviewHtml, more: moreHtml, history: historyHtml, settings: settingsHtml }[view]();
+  app.innerHTML = { today: dayHtml, inbox: inboxHtml, review: reviewHtml, more: moreHtml, history: historyHtml, settings: settingsHtml, portfolio: portfolioHtml }[view]();
   bind(app); bind($('fabslot'));
   if (view === 'today' && viewDate === today() && !didScroll) {
     const n = document.querySelector('.now');
@@ -461,7 +470,7 @@ function dayHtml() {
     ${weekHtml(d)}
     <div class="stack">
     ${needReview ? `<div class="nudge"><span><b>How was yesterday?</b><span class="muted" style="font-size:14px">30 seconds to log it.</span></span><button class="btn day" data-act="review-yesterday">Log it</button></div>` : ''}
-    ${isToday ? healthLine(d) : ''}
+    ${isToday ? healthLine(d) : ''}${isToday ? portfolioLine() : ''}
     ${allDay.length ? `<div class="allday">${allDay.map(e => `<span>${esc(e.title)}</span>`).join('')}</div>` : ''}
     ${trayHtml(d, b)}
     ${sh ? `<p class="shape"><b>${sh.count} meeting${sh.count > 1 ? 's' : ''}</b> · ${dur(sh.mins)} booked${sh.free ? ` · longest free block <b>${timeStr(sh.free[0])}–${timeStr(sh.free[1])}</b>` : ''}</p>` : ''}
@@ -495,6 +504,7 @@ function moreHtml() {
     <button class="menu" data-act="new-note-now"><i>＋</i><span>New meeting note<small>Creates it in your Notion Meetings database and opens it</small></span></button>
     <a class="menu" href="${MEETINGS_DB_URL}" target="_blank" rel="noopener"><i>▤</i><span>Meetings database<small>Open in Notion</small></span></a>
     <a class="menu" href="${TASKS_DB_URL}" target="_blank" rel="noopener"><i>☑</i><span>Task database<small>Open in Notion</small></span></a>
+    <button class="menu" data-act="to-portfolio"><i>◔</i><span>Portfolio<small>${portfolioSubtitle()}</small></span></button>
     <button class="menu" data-act="to-history"><i>↗</i><span>History<small>Mood over time and patterns</small></span></button>
     <button class="menu" data-act="to-settings"><i>⚙</i><span>Settings<small>Connection, theme, backup</small></span></button>`;
 }
@@ -603,6 +613,150 @@ function bindReview(root) {
   });
   const typed = (id, key) => { const el = $(id); if (!el) return; el.oninput = () => { clearTimeout(saveTimer); $('saved').textContent = 'Saving…'; saveTimer = setTimeout(() => patchReview({ [key]: el.value }), 400); }; el.onblur = () => { clearTimeout(saveTimer); patchReview({ [key]: el.value }); }; };
   typed('did', 'did'); typed('win', 'win');
+}
+
+/* ----- portfolio (prices from CoinMarketCap; amounts stay on this phone) ----- */
+const DEMO_COINS = { BTC: [1, 'Bitcoin', 64000, -0.4, 1], ETH: [1027, 'Ethereum', 3100, 1.1, 2], SOL: [5426, 'Solana', 145, 2.3, 5], DOGE: [74, 'Dogecoin', 0.12, -1.2, 9] };
+async function cryptoPost(path, body) {
+  if (!S.demo) return post(path, body);
+  if (path.endsWith('/search')) return { results: Object.fromEntries(body.symbols.map(sy => [sy, DEMO_COINS[sy] ? [{ id: DEMO_COINS[sy][0], name: DEMO_COINS[sy][1], symbol: sy, rank: DEMO_COINS[sy][4], chain: '' }] : []])) };
+  const quotes = {};
+  for (const [sy, c] of Object.entries(DEMO_COINS)) if (body.ids.includes(c[0])) quotes[c[0]] = { symbol: sy, name: c[1], price: c[2], change24h: c[3] };
+  return { at: Date.now(), quotes };
+}
+const usd = (v, dp = 2) => '$' + v.toLocaleString(undefined, { minimumFractionDigits: dp, maximumFractionDigits: dp });
+function fmtPrice(p) {
+  if (p >= 1000) return usd(p, 2); if (p >= 10) return usd(p, 2); if (p >= 1) return usd(p, 4);
+  return '$' + p.toFixed(Math.min(10, Math.max(4, 2 - Math.floor(Math.log10(p)))));
+}
+function fmtAmt(a) { return a >= 1e6 ? (a / 1e6).toFixed(2) + 'M' : a.toLocaleString(undefined, { maximumFractionDigits: a < 1 ? 8 : a < 1000 ? 4 : 2 }); }
+function parseAmount(str) {
+  const m = /^\s*([0-9][0-9,]*\.?[0-9]*|\.[0-9]+)\s*([kKmMbB]?)\s*$/.exec(String(str));
+  if (!m) return null;
+  const n = parseFloat(m[1].replace(/,/g, '')) * ({ k: 1e3, m: 1e6, b: 1e9 }[m[2].toLowerCase()] || 1);
+  return isFinite(n) && n > 0 ? n : null;
+}
+const hidden = txt => (S.settings.hideBalances ? '•••••' : txt);
+function portfolioRows() {
+  return S.crypto.holdings.map(h => {
+    const q = S.crypto.quotes[h.id], price = q ? q.price : null, value = price != null ? price * h.amount : null;
+    const change = q && q.change24h != null ? q.change24h : null;
+    const prev = value != null && change != null ? value / (1 + change / 100) : value;
+    return { h, price, value, change, delta: value != null ? value - prev : 0 };
+  }).sort((a, b) => (b.value || 0) - (a.value || 0));
+}
+function portfolioTotals() {
+  const rows = portfolioRows(), total = rows.reduce((a, r) => a + (r.value || 0), 0), delta = rows.reduce((a, r) => a + r.delta, 0);
+  return { rows, total, delta, pct: total - delta > 0 ? delta / (total - delta) * 100 : 0, priced: rows.filter(r => r.value != null).length };
+}
+const chg = (c, arrow = true) => c == null ? '' : `<span class="${c < 0 ? 'down' : c > 0 ? 'up' : ''}">${arrow ? (c < 0 ? '▼ ' : c > 0 ? '▲ ' : '') : (c > 0 ? '+' : c < 0 ? '−' : '')}${Math.abs(c).toFixed(2)}%</span>`;
+function portfolioLine() {
+  if (!S.crypto.holdings.length || !S.crypto.at) return '';
+  const t = portfolioTotals();
+  return `<button class="pline" data-act="to-portfolio">Portfolio <b>${hidden(usd(t.total, 0))}</b> · ${chg(t.pct, false)} in 24 h</button>`;
+}
+function portfolioSubtitle() {
+  if (!S.crypto.holdings.length) return 'Add your coins to see their value';
+  if (!S.crypto.at) return `${S.crypto.holdings.length} coins`;
+  const t = portfolioTotals(); return `${hidden(usd(t.total, 0))} · ${t.pct < 0 ? '−' : '+'}${Math.abs(t.pct).toFixed(1)}% in 24 h`;
+}
+let cryptoLoading = false;
+async function loadPrices(force) {
+  if (!S.crypto.holdings.length || (!connected() && !S.demo)) return;
+  if (cryptoLoading || (!force && S.crypto.at && Date.now() - S.crypto.at < 60 * 1000)) return;
+  cryptoLoading = true; if (view === 'portfolio') render();
+  try {
+    const r = await cryptoPost('/api/crypto/quotes', { ids: S.crypto.holdings.map(h => h.id) });
+    S.crypto.quotes = r.quotes; S.crypto.at = r.at; S.status.crypto = { at: Date.now(), ok: true, message: '' };
+  } catch (e) { S.status.crypto = { at: Date.now(), ok: false, message: e.message }; }
+  cryptoLoading = false; save(); render();
+}
+function portfolioHtml() {
+  const t = portfolioTotals(), st = S.status.crypto, up = t.delta >= 0, n = S.crypto.holdings.length;
+  const missing = t.rows.filter(r => r.value == null).length;
+  return `<button class="back" data-act="to-more">‹ More</button>
+    <div class="hd"><div><h1>Portfolio</h1><div class="mu">Prices from CoinMarketCap${S.crypto.at ? ` · updated ${new Date(S.crypto.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}</div></div>
+      <span class="pills"><button class="pill" data-act="crypto-hide">${S.settings.hideBalances ? 'Show amounts' : 'Hide amounts'}</button><button class="pill" data-act="crypto-refresh">${cryptoLoading ? 'Updating…' : 'Refresh'}</button></span></div>
+    <div class="stack">
+    ${n ? `<div class="card"><div class="mu">Total value</div><div class="tot num">${hidden(usd(t.total))}</div>
+      <div class="num" style="font-size:14px">${S.crypto.at ? `<span class="${up ? 'up' : 'down'}">${hidden(`${up ? '+' : '−'}${usd(Math.abs(t.delta))}`)} · ${up ? '▲' : '▼'} ${Math.abs(t.pct).toFixed(2)}%</span> <span class="muted">in 24 h</span>` : '<span class="muted">Prices not loaded yet.</span>'}</div></div>` : ''}
+    <div class="card">${n ? t.rows.map(r => `<button class="prow" data-hold="${r.h.id}"><span><span class="sym">${esc(r.h.symbol)}</span><small>${esc(r.h.name || '')}</small></span>
+        <span class="r num">${r.price != null ? fmtPrice(r.price) : '—'}<small>${chg(r.change)}</small></span>
+        <span class="r num">${r.value != null ? hidden(usd(r.value)) : '—'}<small>${hidden(fmtAmt(r.h.amount))} ${esc(r.h.symbol)}</small></span></button>`).join('')
+      : '<p class="empty">No coins yet. Add one by ticker, or paste your whole list at once.</p>'}
+      <div class="row" style="margin-top:10px"><button class="btn day" data-act="crypto-add">+ Add coin</button><button class="btn" data-act="crypto-paste">Paste a list</button></div></div>
+    ${st && !st.ok ? `<div class="errbox">${esc(st.message)}${S.crypto.at ? '<br>Showing prices from ' + new Date(S.crypto.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.' : ''}</div>` : ''}
+    ${missing && S.crypto.at && !(st && !st.ok) ? `<div class="errbox">${missing} coin${missing > 1 ? 's have' : ' has'} no price from CoinMarketCap. Tap ${missing > 1 ? 'one' : 'it'} to check it is the right coin.</div>` : ''}
+    <p class="muted" style="font-size:12px;margin:4px 2px 0">The amounts are what you enter here and stay on this phone. Prices are informational and refresh about once a minute while you look.</p></div>`;
+}
+function coinLabel(c) { return `${c.name} (${c.symbol})${c.rank ? ` · rank ${c.rank}` : ' · unranked'}${c.chain ? ` · on ${c.chain}` : ''}`; }
+function addHolding(coin, amount) {
+  const ex = S.crypto.holdings.find(h => h.id === coin.id);
+  if (ex) ex.amount = amount; else S.crypto.holdings.push({ id: coin.id, symbol: coin.symbol, name: coin.name, amount });
+}
+function openAddHolding() {
+  let found = [];
+  openSheet(`<h2>Add a coin</h2><p class="muted" style="margin:2px 0 4px">Type the ticker, then pick the right coin. Some tickers belong to several coins.</p>
+    <div class="row"><input class="field" id="cTicker" placeholder="Ticker, for example HYPE" autocapitalize="characters" autofocus><button class="btn" id="cFind" style="margin-top:8px">Find</button></div>
+    <div id="cPick"></div>
+    <div class="row" style="margin-top:16px"><button class="btn day" id="cSave" disabled>Add coin</button><button class="btn" id="cCancel">Cancel</button></div>`);
+  $('cCancel').onclick = closeSheet;
+  const find = async () => {
+    const sym = $('cTicker').value.trim().toUpperCase(); if (!/^[A-Z0-9]{1,12}$/.test(sym)) return toast('Enter a ticker, letters and numbers only.');
+    $('cPick').innerHTML = '<p class="muted">Looking it up…</p>';
+    try {
+      found = (await cryptoPost('/api/crypto/search', { symbols: [sym] })).results[sym] || [];
+      $('cPick').innerHTML = found.length ? `<span class="lbl2">Which coin?</span><select class="field" id="cSel" style="margin-top:0">${found.map((c, i) => `<option value="${i}">${esc(coinLabel(c))}</option>`).join('')}</select>
+        <span class="lbl2">How many do you hold?</span><input class="field" id="cAmt" inputmode="decimal" placeholder="For example 169.5 or 17.99M" style="margin-top:0">` : '<div class="errbox">CoinMarketCap has no active coin with that ticker.</div>';
+      $('cSave').disabled = !found.length;
+    } catch (e) { $('cPick').innerHTML = `<div class="errbox">${esc(e.message)}</div>`; }
+  };
+  $('cFind').onclick = find; $('cTicker').onkeydown = e => { if (e.key === 'Enter') find(); };
+  $('cSave').onclick = () => {
+    const amt = parseAmount($('cAmt') ? $('cAmt').value : ''); if (amt == null) return toast('Enter how many you hold, as a number.');
+    const coin = found[+$('cSel').value], ex = S.crypto.holdings.find(h => h.id === coin.id);
+    if (ex && !confirm(`${coin.symbol} is already in your portfolio with ${fmtAmt(ex.amount)}. Replace that with ${fmtAmt(amt)}?`)) return;
+    addHolding(coin, amt); save(); closeSheet(); render(); loadPrices(true); toast(ex ? 'Amount updated' : 'Coin added');
+  };
+}
+function openPasteHoldings() {
+  openSheet(`<h2>Paste your coins</h2><p class="muted" style="margin:2px 0 4px">One per line: ticker, then the amount. For example <b>HYPE 169.5</b>. Amounts like 17.99M or 5k work too.</p>
+    <textarea class="field" id="pText" placeholder="HYPE 169.5&#10;BTC 0.00001943"></textarea>
+    <div id="pReview"></div>
+    <div class="row" style="margin-top:16px"><button class="btn day" id="pLook">Look up</button><button class="btn" id="pCancel">Cancel</button></div>`);
+  $('pCancel').onclick = closeSheet;
+  let items = [];
+  $('pLook').onclick = async () => {
+    if (items.length) { // second tap: save the reviewed list
+      const picked = items.filter(it => it.coins.length).map(it => ({ coin: it.coins[+($(`pSel${it.i}`) ? $(`pSel${it.i}`).value : 0)], amount: it.amount }));
+      picked.forEach(x => addHolding(x.coin, x.amount)); save(); closeSheet(); render(); loadPrices(true); return toast(`${picked.length} coin${picked.length === 1 ? '' : 's'} added or updated`);
+    }
+    const sums = {}, bad = [];
+    for (const line of $('pText').value.split('\n').map(l => l.trim()).filter(Boolean)) {
+      const m = /^([A-Za-z0-9]{1,12})[\s:=,\t]+(.+)$/.exec(line), amt = m ? parseAmount(m[2]) : null;
+      if (!m || amt == null) bad.push(line); else sums[m[1].toUpperCase()] = (sums[m[1].toUpperCase()] || 0) + amt;
+    }
+    const symbols = Object.keys(sums); if (!symbols.length) return toast('Nothing to look up. Use one line per coin, like HYPE 169.5');
+    $('pLook').disabled = true; $('pReview').innerHTML = '<p class="muted">Looking them up…</p>';
+    try {
+      const res = (await cryptoPost('/api/crypto/search', { symbols: symbols.slice(0, 30) })).results;
+      items = symbols.map((sy, i) => ({ i, sy, amount: sums[sy], coins: res[sy] || [] }));
+      $('pReview').innerHTML = `<span class="lbl2">Check each coin, then add. A coin you already hold gets the new amount.</span>${items.map(it => it.coins.length
+        ? `<div class="card" style="margin-top:6px;padding:10px 12px"><b>${esc(it.sy)}</b> · <span class="muted">${esc(fmtAmt(it.amount))}</span><select class="field" id="pSel${it.i}" style="margin-top:6px">${it.coins.map((c, k) => `<option value="${k}">${esc(coinLabel(c))}</option>`).join('')}</select></div>`
+        : `<div class="errbox"><b>${esc(it.sy)}</b>: no active coin with that ticker, skipped.</div>`).join('')}
+        ${bad.length ? `<div class="errbox">Could not read: ${esc(bad.join(' | '))}</div>` : ''}`;
+      $('pLook').textContent = `Add ${items.filter(it => it.coins.length).length} coins`; $('pLook').disabled = !items.some(it => it.coins.length);
+    } catch (e) { items = []; $('pLook').disabled = false; $('pReview').innerHTML = `<div class="errbox">${esc(e.message)}</div>`; }
+  };
+}
+function openHolding(id) {
+  const h = S.crypto.holdings.find(x => x.id === id); if (!h) return;
+  openSheet(`<h2>${esc(h.name || h.symbol)} (${esc(h.symbol)})</h2><p class="muted" style="margin:2px 0 4px">CoinMarketCap id ${h.id}. If the price looks wrong, remove it and add the right coin.</p>
+    <span class="lbl2">Amount you hold</span><input class="field" id="hAmt" inputmode="decimal" value="${h.amount}" style="margin-top:0">
+    <div class="row" style="margin-top:16px"><button class="btn day" id="hSave">Save</button><button class="btn" id="hDel">Remove</button><button class="btn" id="hCancel">Cancel</button></div>`);
+  $('hCancel').onclick = closeSheet;
+  $('hSave').onclick = () => { const a = parseAmount($('hAmt').value); if (a == null) return toast('Enter the amount as a number.'); h.amount = a; save(); closeSheet(); render(); };
+  $('hDel').onclick = () => { if (!confirm(`Remove ${h.symbol} from your portfolio?`)) return; S.crypto.holdings = S.crypto.holdings.filter(x => x.id !== id); delete S.crypto.quotes[id]; save(); closeSheet(); render(); };
 }
 
 /* ----- settings ----- */
@@ -865,6 +1019,7 @@ function bind(root) {
   root.querySelectorAll('[data-ev]').forEach(b => b.onclick = () => openEvent(b.dataset.ev));
   root.querySelectorAll('[data-done]').forEach(b => b.onclick = () => toggleTask(b.dataset.done));
   root.querySelectorAll('[data-task]').forEach(b => b.onclick = () => openTask(b.dataset.task));
+  root.querySelectorAll('[data-hold]').forEach(b => b.onclick = () => openHolding(+b.dataset.hold));
   root.querySelectorAll('[data-day]').forEach(b => b.onclick = () => { viewDate = b.dataset.day; render(); loadDay(viewDate); });
   root.querySelectorAll('[data-mf]').forEach(b => b.onclick = () => { mailFilter = b.dataset.mf; render(); });
   root.querySelectorAll('[data-mtask]').forEach(b => b.onclick = () => openMailTask(b.dataset.mtask));
@@ -895,6 +1050,11 @@ async function act(a) {
   else if (a === 'goto-settings' || a === 'to-settings') { view = 'settings'; render(); window.scrollTo(0, 0); }
   else if (a === 'to-more') { view = 'more'; render(); window.scrollTo(0, 0); }
   else if (a === 'to-history') { view = 'history'; render(); window.scrollTo(0, 0); }
+  else if (a === 'to-portfolio') { view = 'portfolio'; render(); window.scrollTo(0, 0); loadPrices(); }
+  else if (a === 'crypto-refresh') loadPrices(true);
+  else if (a === 'crypto-add') openAddHolding();
+  else if (a === 'crypto-paste') openPasteHoldings();
+  else if (a === 'crypto-hide') { S.settings.hideBalances = !S.settings.hideBalances; save(); render(); }
   else if (a === 'review-yesterday') { reviewDate = addDays(today(), -1); go('review'); }
   else if (a === 'add-task') openAddTask();
   else if (a === 'fab') openFabMenu();
@@ -930,7 +1090,8 @@ async function act(a) {
           : full ? 'Google Calendar and Gmail: connected, including adding events.' : 'Google Calendar: connected, but <b>Gmail and adding events are not granted yet</b>. Tap “Connect Google (Calendar and Gmail)” again and approve.',
         r.connected ? 'Google Health (sleep, steps): connected.' : 'Google Health: <b>not connected</b>. Open Calorie tracker → Settings → Connect Google Health.',
         r.notion ? 'Notion: set up on the Worker.' : 'Notion: <b>not set up</b> on the Worker yet.',
-        r.meetingsDb ? 'Meetings database: set up.' : 'Meetings database: <b>not set up</b> on the Worker yet.'];
+        r.meetingsDb ? 'Meetings database: set up.' : 'Meetings database: <b>not set up</b> on the Worker yet.',
+        r.crypto ? 'CoinMarketCap (Portfolio prices): set up.' : 'CoinMarketCap (Portfolio prices): <b>not set up</b> on the Worker yet. Optional.'];
       out.innerHTML = `<div class="${r.calendarConnected && full && r.connected && r.notion && r.meetingsDb ? 'okbox' : 'errbox'}">${lines.join('<br>')}</div>`;
     } catch (e) { out.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; }
   }
@@ -956,7 +1117,7 @@ function toast(msg, label, fn) {
 
 /* ---------- backup / demo / refresh ---------- */
 function exportData() {
-  const blob = new Blob([JSON.stringify({ app: 'myday', version: 1, exportedAt: Date.now(), reviews: S.reviews, prep: S.prep, tags: S.tags }, null, 1)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify({ app: 'myday', version: 1, exportedAt: Date.now(), reviews: S.reviews, prep: S.prep, tags: S.tags, holdings: S.crypto.holdings }, null, 1)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = `myday-backup-${today()}.json`;
   document.body.appendChild(a); a.click(); a.remove();
@@ -973,6 +1134,7 @@ function importData(ev) {
       for (const [date, rv] of Object.entries(d.reviews)) { const mine = S.reviews[date]; if (!mine || (rv.updatedAt || 0) > (mine.updatedAt || 0)) { S.reviews[date] = rv; n++; } }
       for (const [k, v] of Object.entries(d.prep || {})) if (!S.prep[k]) S.prep[k] = v;
       for (const t of d.tags || []) if (!S.tags.includes(t)) S.tags.push(t);
+      for (const h of d.holdings || []) if (h && h.id && !S.crypto.holdings.some(x => x.id === h.id)) S.crypto.holdings.push(h);
       save(); render(); toast(`Imported ${n} day${n === 1 ? '' : 's'}`);
     } catch (e) { toast('Could not import: ' + e.message); }
   };
@@ -1003,10 +1165,11 @@ function loadDemo() {
   }
   S.health[t] = Object.assign(S.health[t] || {}, { sleepMinutes: 432, sleepDeepMin: 74, sleepRemMin: 98, restingHr: 56 });
   S.health[addDays(t, -1)] = Object.assign(S.health[addDays(t, -1)] || {}, { steps: 9120 });
+  S.crypto = { holdings: [{ id: 1, symbol: 'BTC', name: 'Bitcoin', amount: 0.05 }, { id: 1027, symbol: 'ETH', name: 'Ethereum', amount: 1.2 }, { id: 74, symbol: 'DOGE', name: 'Dogecoin', amount: 1500 }], quotes: {}, at: 0 };
   S.demo = true; S.status = {}; save();
 }
 function removeDemo() {
-  S.demo = false; S.cache = {}; S.tasks = null; S.inbox = null; S.health = {}; S.status = {};
+  S.demo = false; S.cache = {}; S.tasks = null; S.inbox = null; S.health = {}; S.status = {}; S.crypto = { holdings: [], quotes: {}, at: 0 };
   for (const [d, r] of Object.entries(S.reviews)) if (r.demo) delete S.reviews[d];
   save();
 }
@@ -1025,7 +1188,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
 }
 render();
 if (connected()) {
-  loadDay(viewDate); loadInbox();
+  loadDay(viewDate); loadInbox(); loadPrices();
   if (!Object.keys(S.health).length) syncHealth(30); else if (Date.now() - S.healthAt > 30 * 60 * 1000) syncHealth(7);
 }
 document.addEventListener('visibilitychange', () => {
@@ -1037,6 +1200,7 @@ document.addEventListener('visibilitychange', () => {
   if ((view === 'today' || view === 'review') && (!c || Date.now() - c.at > 5 * 60 * 1000)) loadDay(d);
   if (view === 'inbox' && (!S.inbox || Date.now() - S.inbox.at > 5 * 60 * 1000)) loadInbox();
 });
+setInterval(() => { if (view === 'portfolio' && !document.hidden && !$('overlay').innerHTML) loadPrices(); }, 5 * 60 * 1000); // keeps prices fresh while the page is open
 setInterval(() => { if (rollDay() && connected() && !$('overlay').innerHTML) loadDay(viewDate); if (view === 'today' && viewDate === today() && !$('overlay').innerHTML && !document.hidden) render(); }, 60 * 1000); // keeps the now-line and "next" label current
 </script>
 </body>
