@@ -3,7 +3,7 @@
 A small personal app for an Android phone. One screen for the day, plus a review afterwards.
 
 - **Day:** a week strip, then your to-dos and a timeline of the day with meetings and timed tasks. Tap a meeting for a brief: who is invited, the description, **who they are in your Notion CRM**, recent email with them, and your private prep notes. Tap an empty slot or the **+** button to add an event, a task or a meeting note.
-- **Inbox:** your unread Gmail, newest first, with sender, subject and a preview. Mail from people in your CRM is marked. Tap a mail to open it in Gmail, or **+ Task** to turn it into a Notion task linked to the sender.
+- **Inbox:** your unread mail from the main (Primary) inbox, newest first, with sender, subject and a preview. Social (LinkedIn and similar), promotions, updates and forums are left out. Mail from people in your CRM is marked. Tap a mail to open it in Gmail, or **+ Task** to turn it into a Notion task linked to the sender.
 - **Review:** log the day, usually next morning: mood, energy, what it was about, what happened. History shows mood over time and simple patterns against sleep, sport and steps.
 - **More:** start a **new meeting note** in your Notion Meetings database, open the Meetings and Task databases in Notion, History and Settings.
 

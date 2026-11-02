@@ -181,12 +181,14 @@ svg text { fill: var(--muted); font-size: 10px; font-family: inherit; }
 
 <script>
 'use strict';
-const BUILD = '2026-11-02.1';
+const BUILD = '2026-11-02.3';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
 const MOODS = [['😞', 'Rough'], ['🙁', 'Meh'], ['😐', 'Okay'], ['🙂', 'Good'], ['😄', 'Great']];
-const BASE_TAGS = ['Work', 'Sport', 'Social', 'Family', 'Errands', 'Learning', 'Rest', 'Travel', 'Outdoors', 'Creative'];
+const BASE_TAGS = ['Work', 'Social', 'Family', 'Errands', 'Learning', 'Rest', 'Travel', 'Outdoors', 'Creative'];
+const SPORT_TAGS = ['Run', 'Gym', 'Golf 9', 'Golf 18', 'Golf Indoor', 'Tennis', 'Padel'];
+const isSport = r => (r.tags || []).some(t => t === 'Sport' || SPORT_TAGS.includes(t)); // 'Sport' kept so older entries still count
 const WORK_START = 9, WORK_END = 18; // window used to find your longest free block
 const HH = 52, LW = 46; // timeline: pixels per hour, width of the hour labels
 
@@ -466,7 +468,7 @@ function inboxHtml() {
   const f = { all: () => true, crm: m => !!m.crm, starred: m => m.starred, recent: m => now - m.at < 2 * 864e5 }[mailFilter];
   const list = I ? I.messages.filter(f) : [];
   const chips = [['all', 'All'], ['crm', 'From CRM'], ['starred', 'Starred'], ['recent', 'Last 2 days']];
-  return `<div class="hd"><div><h1>Inbox</h1><div class="mu">${I ? `${I.unread} unread${I.messages.length < I.unread ? ` · showing the latest ${I.messages.length}` : ''}` : ''}</div></div>${pill()}</div>
+  return `<div class="hd"><div><h1>Inbox</h1><div class="mu">${I ? `${I.unread} unread in your main inbox${I.messages.length < I.unread ? ` · showing the latest ${I.messages.length}` : ''}` : ''}</div></div>${pill()}</div>
     <div class="chips" style="margin-bottom:6px">${chips.map(([k, l]) => `<button class="chip ${mailFilter === k ? 'on' : ''}" data-mf="${k}">${l}</button>`).join('')}</div>
     ${!I ? `<p class="empty">${connected() ? (st && !st.ok ? '' : 'Loading your inbox…') : 'Connect Google in Settings to see your unread mail.'}</p>` : ''}
     ${st && !st.ok ? `<div class="errbox">${esc(st.message)}${I ? '<br>Showing the copy from ' + new Date(I.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.' : ''}</div>` : ''}
@@ -475,7 +477,7 @@ function inboxHtml() {
       <div class="l1"><b>${esc(m.from.name)}${m.crm ? `<span class="badge day" style="color:var(--ink)">CRM${m.crm.tier ? ' ' + esc(m.crm.tier.split(' ')[0]) : ''}</span>` : ''}${m.starred ? ' ★' : ''}</b><span>${mailTime(m.at)}</span></div>
       <div class="l2">${esc(m.subject)}</div><div class="l3">${esc(m.snippet)}</div></a>
       <button class="mt" data-mtask="${esc(m.id)}" aria-label="Make a task from this mail">+ Task</button></div>`).join('')}
-    <p class="muted" style="font-size:12px;margin:12px 2px 0">Tapping a mail opens it in Gmail. My Day only reads your mail.</p>`;
+    <p class="muted" style="font-size:12px;margin:12px 2px 0">Your main (Primary) inbox only: social, promotions and updates are left out. Tapping a mail opens it in Gmail. My Day only reads your mail.</p>`;
 }
 
 /* ----- more / history ----- */
@@ -495,11 +497,17 @@ function insightHtml(days) {
   const withSleep = rows.filter(x => x.h && x.h.sleepMinutes != null);
   const lines = [
     cmp('Sleep 7h or more', withSleep.filter(x => x.h.sleepMinutes >= 420), withSleep.filter(x => x.h.sleepMinutes < 420), '7h+ of sleep', 'less sleep'),
-    cmp('Days with sport', rows.filter(x => (x.r.tags || []).includes('Sport')), rows.filter(x => !(x.r.tags || []).includes('Sport')), 'sport', 'no sport'),
+    cmp('Days with sport', rows.filter(x => isSport(x.r)), rows.filter(x => !isSport(x.r)), 'sport', 'no sport'),
     cmp('Days with 8,000+ steps', rows.filter(x => x.h && x.h.steps >= 8000), rows.filter(x => x.h && x.h.steps != null && x.h.steps < 8000), '8,000+ steps', 'fewer steps'),
   ].filter(Boolean);
   return `<div class="card"><h3>Patterns</h3>${lines.length ? `<div class="kv num">${lines.join('')}</div>` : `<p class="empty">Patterns show up once you have at least four logged days on each side of a comparison (sleep, sport, steps). You have ${rows.length} mood entries in this period.</p>`}
     <p class="muted" style="font-size:12px;margin:10px 0 0">These are averages of your own entries, not proof that one thing causes the other.</p></div>`;
+}
+function sportHtml(days) {
+  const counts = {};
+  for (const d of days) for (const t of (S.reviews[d] || {}).tags || []) if (SPORT_TAGS.includes(t)) counts[t] = (counts[t] || 0) + 1;
+  const total = days.filter(d => S.reviews[d] && isSport(S.reviews[d])).length;
+  return `<div class="card"><h3>Sport</h3>${total ? `<div class="kv num">${SPORT_TAGS.filter(t => counts[t]).map(t => `<span class="k">${esc(t)}</span><b>${counts[t]}×</b>`).join('')}<span class="k">Days with sport</span><b>${total} of ${days.length}</b></div>` : '<p class="empty">Tag a day with Run, Gym, Golf, Tennis or Padel in the Review and it shows up here.</p>'}</div>`;
 }
 function moodChart(days) {
   const W = 340, H = 110, padL = 22, padB = 16, padT = 8, pw = W - padL - 6, ph = H - padB - padT;
@@ -525,6 +533,7 @@ function historyHtml() {
   return `<button class="back" data-act="to-more">‹ More</button><div class="hd"><h1>History</h1>${pill()}</div><div class="stack">
     <div class="seg">${[14, 30, 90].map(n => `<button data-hist="${n}" class="${histDays === n ? 'on' : ''}">${n} days</button>`).join('')}</div>
     <div class="card"><h3>Mood</h3>${moodChart(days)}<p class="muted" style="font-size:12px;margin:6px 0 0">${logged.length} of ${histDays} days logged. Gaps are days with no entry.</p></div>
+    ${sportHtml(days)}
     ${insightHtml(days)}
     <div class="card"><h3>Your days</h3>${list || '<p class="empty">Nothing logged yet. Try the Review tab tomorrow morning.</p>'}</div></div>`;
 }
@@ -555,6 +564,8 @@ function reviewHtml() {
       <span class="lbl2">Energy</span>
       <div class="scale">${[1, 2, 3, 4, 5].map(n => `<button data-energy="${n}" class="${r.energy === n ? 'on' : ''}">${n}</button>`).join('')}</div>
       <div class="scalehint"><span>drained</span><span>full of energy</span></div>
+      <span class="lbl2">Sport</span>
+      <div class="chips">${SPORT_TAGS.map(t => `<button class="chip ${(r.tags || []).includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}</div>
       <span class="lbl2">What was it about?</span>
       <div class="chips">${tags.map(t => `<button class="chip ${(r.tags || []).includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}<button class="chip" data-act="new-tag">+ tag</button></div>
       <span class="lbl2">What happened</span>
@@ -608,7 +619,7 @@ function settingsHtml() {
       <div class="seg">${[['dark', 'Dark'], ['light', 'Light'], ['auto', 'Match phone']].map(([k, l]) => `<button data-theme-set="${k}" class="${S.settings.theme === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
     <div class="card"><h3>Your tags</h3>
       <p class="muted">Quick tags in the Review. Add your own from the Review tab; tap one of yours here to remove it.</p>
-      <div class="chips">${BASE_TAGS.map(t => `<span class="chip">${esc(t)}</span>`).join('')}${S.tags.map(t => `<button class="chip on" data-tagdel="${esc(t)}">${esc(t)} ✕</button>`).join('')}</div></div>
+      <div class="chips">${[...SPORT_TAGS, ...BASE_TAGS].map(t => `<span class="chip">${esc(t)}</span>`).join('')}${S.tags.map(t => `<button class="chip on" data-tagdel="${esc(t)}">${esc(t)} ✕</button>`).join('')}</div></div>
     <div class="card"><h3>Your data</h3>
       <p class="muted">Reviews and prep notes live on this device only. Export a backup now and then.</p>
       <div class="row" style="flex-wrap:wrap"><button class="btn" data-act="export">Export backup</button><button class="btn" data-act="import">Import backup</button>
@@ -881,8 +892,8 @@ async function act(a) {
   else if (a === 'new-note-now') startMeetingNote({ title: 'Meeting', start: new Date().toISOString() });
   else if (a === 'new-tag') {
     const t = (prompt('New tag name') || '').trim().slice(0, 20);
-    if (t && ![...BASE_TAGS, ...S.tags].some(x => x.toLowerCase() === t.toLowerCase())) { S.tags.push(t); save(); }
-    if (t) { const cur = (S.reviews[reviewDate] || {}).tags || [], name = [...BASE_TAGS, ...S.tags].find(x => x.toLowerCase() === t.toLowerCase()); if (!cur.includes(name)) patchReview({ tags: [...cur, name] }); render(); }
+    if (t && ![...BASE_TAGS, ...SPORT_TAGS, ...S.tags].some(x => x.toLowerCase() === t.toLowerCase())) { S.tags.push(t); save(); }
+    if (t) { const cur = (S.reviews[reviewDate] || {}).tags || [], name = [...BASE_TAGS, ...SPORT_TAGS, ...S.tags].find(x => x.toLowerCase() === t.toLowerCase()); if (!cur.includes(name)) patchReview({ tags: [...cur, name] }); render(); }
   }
   else if (a === 'fill-notes') {
     const c = S.cache[reviewDate], done = (S.tasks && S.tasks.doneOn[reviewDate]) || [], lines = [];
@@ -975,11 +986,11 @@ function loadDemo() {
   S.inbox = { at: now, account: 'me@example.com', unread: 3, messages: [
     { id: 'm1', threadId: 'a1', from: { name: 'Dana Fox', email: 'dana@acme.example' }, subject: 'Re: pilot terms', snippet: 'Thanks for sending this over. Can we move the kickoff to the week of the 16th? Legal wants one more look.', at: now - 36e5, starred: true, crm: { id: 'demo-p1', name: 'Dana Fox', tier: 'A - Key' } },
     { id: 'm2', threadId: 'a2', from: { name: 'Bank', email: 'noreply@bank.example' }, subject: 'Your October statement is ready', snippet: 'Your statement is now available in online banking.', at: now - 5 * 36e5, starred: false, crm: null },
-    { id: 'm3', threadId: 'a3', from: { name: 'Notion', email: 'team@notion.example' }, subject: 'What’s new this month', snippet: 'New AI features, calendar improvements and more.', at: now - 3 * 864e5, starred: false, crm: null }] };
+    { id: 'm3', threadId: 'a3', from: { name: 'Tom Reid', email: 'tom@example.com' }, subject: 'Lunch on Thursday?', snippet: 'Are you free around one? Café Central again?', at: now - 3 * 864e5, starred: false, crm: null }] };
   for (let i = 1; i <= 21; i++) {
     const d = addDays(t, -i), seed = (i * 37) % 11, mood = 1 + ((seed + i) % 5);
     S.health[d] = Object.assign(S.health[d] || {}, { steps: 4000 + seed * 900, sleepMinutes: 360 + seed * 14, sleepDeepMin: 60 + seed, sleepRemMin: 80 + seed * 2, restingHr: 55 + (seed % 5), caloriesOut: 2300 + seed * 60 });
-    if (i % 4 !== 0) S.reviews[d] = { mood: Math.min(5, Math.max(1, S.health[d].sleepMinutes >= 420 ? mood + 1 : mood)), energy: 1 + (seed % 5), tags: [['Work'], ['Work', 'Sport'], ['Social', 'Family'], ['Rest'], ['Work', 'Learning']][i % 5], did: ['Busy day of meetings, then a run.', 'Dinner with friends.', 'Quiet day, caught up on admin.', 'Long planning session.'][i % 4], win: i % 3 ? '' : 'Finished the report', updatedAt: Date.now() - i, demo: true };
+    if (i % 4 !== 0) S.reviews[d] = { mood: Math.min(5, Math.max(1, S.health[d].sleepMinutes >= 420 ? mood + 1 : mood)), energy: 1 + (seed % 5), tags: [['Work'], ['Work', 'Run'], ['Social', 'Family', 'Golf 9'], ['Rest'], ['Work', 'Learning', 'Padel']][i % 5], did: ['Busy day of meetings, then a run.', 'Dinner with friends.', 'Quiet day, caught up on admin.', 'Long planning session.'][i % 4], win: i % 3 ? '' : 'Finished the report', updatedAt: Date.now() - i, demo: true };
   }
   S.health[t] = Object.assign(S.health[t] || {}, { sleepMinutes: 432, sleepDeepMin: 74, sleepRemMin: 98, restingHr: 56 });
   S.health[addDays(t, -1)] = Object.assign(S.health[addDays(t, -1)] || {}, { steps: 9120 });
