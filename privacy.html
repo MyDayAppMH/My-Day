@@ -22,21 +22,22 @@
   <h1>My Day: Privacy policy</h1>
   <p class="muted">Last updated 31 October 2026</p>
 
-  <p>My Day is a small personal app that shows one person their day ahead (calendar meetings and to-dos) and lets them log how the day went. This page explains what happens to that information.</p>
+  <p>My Day is a small personal app that shows one person their day (calendar meetings, to-dos and unread mail) and lets them log how the day went. This page explains what happens to that information.</p>
 
   <p><a href="./">Back to the app</a></p>
 
   <h2>What the app reads or changes</h2>
   <ul>
-    <li><strong>Google Calendar:</strong> read-only access to the events on the calendars you have switched on, including title, time, place, description and the people invited. It cannot create, change or delete events.</li>
+    <li><strong>Google Calendar:</strong> it reads the events on the calendars you have switched on, including title, time, place, description and the people invited. When you add an event in the app, it creates that one event on your calendar, and sends invitations only if you add guests. It does not change or delete existing events.</li>
+    <li><strong>Gmail:</strong> read-only access to your unread inbox (sender, subject, a short preview) and to recent mail with people you are meeting. It cannot send, delete or change mail. Opening a mail happens in Gmail itself.</li>
     <li><strong>Google Health:</strong> read-only access to daily steps, calories burned, sleep and heart-rate figures, used to show how you slept and how active you were.</li>
-    <li><strong>Notion:</strong> the app reads your task database and, for the people in a meeting, your contact records, so it can show who you are meeting. It can mark tasks done and add tasks you create in the app. It does nothing else in Notion.</li>
+    <li><strong>Notion:</strong> it reads your task database and, for the people in a meeting or an email, your contact records. It can mark tasks done, add tasks you create, and create a meeting note in your Meetings database. It does nothing else in Notion.</li>
   </ul>
 
   <h2>Where information is kept</h2>
   <ul>
     <li><strong>Your daily reviews</strong> (mood, energy, notes) and meeting prep notes are stored only in your phone's browser storage. They are never sent to a server.</li>
-    <li><strong>Calendar, task and health data</strong> is fetched on request by a small server program (a Cloudflare Worker) that you or the app owner control, and passed to the app on your phone. The app keeps a recent copy on your phone so it can show it without a connection.</li>
+    <li><strong>Calendar, task, mail and health data</strong> is fetched on request by a small server program (a Cloudflare Worker) that you or the app owner control, and passed to the app on your phone. The app keeps a recent copy on your phone (including subjects and previews of your latest unread mail) so it can show them without a connection. Clearing the site's data in your browser removes it.</li>
     <li><strong>Access tokens</strong> for Google and Notion are stored in that same private Cloudflare account. The server is protected by a secret key, so only the app owner's phone can use it.</li>
   </ul>
 
@@ -45,7 +46,7 @@
     <li>We do not sell, rent or share your information with anyone.</li>
     <li>We do not show advertising or use your information for advertising.</li>
     <li>We do not use analytics or tracking tools and do not build profiles of you.</li>
-    <li>No person reads your calendar, tasks or health data. The app only shows it back to you.</li>
+    <li>No person reads your calendar, mail, tasks or health data. The app only shows it back to you.</li>
   </ul>
 
   <h2>Google API Services User Data Policy</h2>
@@ -53,7 +54,7 @@
 
   <h2>Your choices</h2>
   <ul>
-    <li><strong>Stop Google access:</strong> go to <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a> and remove access. The app can then no longer read your calendar or health data.</li>
+    <li><strong>Stop Google access:</strong> go to <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a> and remove access. The app can then no longer read your calendar, mail or health data.</li>
     <li><strong>Stop Notion access:</strong> remove the integration's connections in Notion (Settings, Connections).</li>
     <li><strong>Delete your reviews:</strong> clear this site's data in your browser settings, or remove the installed app. Settings has an export option if you want a copy first.</li>
   </ul>

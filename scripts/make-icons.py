@@ -1,7 +1,7 @@
 """Generate the app icons (needs Pillow). Run from the repo root: python3 scripts/make-icons.py"""
 from PIL import Image, ImageDraw
 
-INDIGO, WHITE, SOFT = (59, 91, 219), (255, 255, 255), (200, 210, 250)
+INDIGO, WHITE, SOFT = (17, 17, 19), (244, 244, 245), (161, 161, 170)  # graphite background, near-white page
 
 def draw(size, safe):
     s = size * 4
@@ -16,7 +16,7 @@ def draw(size, safe):
     for fx in (0.30, 0.70):  # binder rings
         d.rounded_rectangle([x0 + box * (fx - 0.035), y0 + box * 0.10, x0 + box * (fx + 0.035), y0 + box * 0.26], radius=box * 0.03, fill=WHITE)
     w = int(box * 0.065)
-    d.line([(x0 + box * 0.32, y0 + box * 0.62), (x0 + box * 0.45, y0 + box * 0.74), (x0 + box * 0.68, y0 + box * 0.50)], fill=INDIGO, width=w, joint="curve")
+    d.line([(x0 + box * 0.32, y0 + box * 0.62), (x0 + box * 0.45, y0 + box * 0.74), (x0 + box * 0.68, y0 + box * 0.50)], fill=(17, 17, 19), width=w, joint="curve")
     return img.resize((size, size), Image.LANCZOS)
 
 draw(192, 0.80).save("icon-192.png")

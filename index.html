@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -9,162 +9,186 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="My Day">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#f5f6fa" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#15171c" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#111113" id="themeColor">
 <title>My Day</title>
 <style>
 :root {
-  --bg: #f5f6fa; --card: #ffffff; --ink: #1c2027; --muted: #69727d; --line: #e3e6ed;
-  --day: #3b5bdb; --day-soft: #e4e9fc; --good: #2b8a3e; --good-soft: #dcf2e0; --warn: #c2650a; --warn-soft: #fbead6;
-  --danger: #b3261e; --accent: #1c2027; --accent-ink: #ffffff; --shadow: 0 1px 2px rgba(0,0,0,.06);
+  --bg: #111113; --card: #19191c; --ink: #f4f4f5; --muted: #a1a1aa; --line: #2a2a2e;
+  --acc: #f4f4f5; --soft: #2a2a2e; --onacc: #111113; --task: #fb7185; --tsoft: #3b1a22;
+  --good: #4ade80; --good-soft: #14301f; --warn: #f0a04b; --warn-soft: #3a2b18; --danger: #fb7185;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #15171c; --card: #1e2128; --ink: #eceef2; --muted: #98a1ad; --line: #2c313a;
-    --day: #7c9aff; --day-soft: #232c4d; --good: #5fcf7a; --good-soft: #1b3323; --warn: #f0a04b; --warn-soft: #3a2b18;
-    --danger: #f2736b; --accent: #eceef2; --accent-ink: #15171c; --shadow: none;
+:root[data-theme="light"] {
+  --bg: #f4f4f5; --card: #ffffff; --ink: #18181b; --muted: #71717a; --line: #e4e4e7;
+  --acc: #18181b; --soft: #e4e4e7; --onacc: #ffffff; --task: #be123c; --tsoft: #fde4ea;
+  --good: #15803d; --good-soft: #dcf5e4; --warn: #b45309; --warn-soft: #fbead6; --danger: #be123c;
+}
+@media (prefers-color-scheme: light) {
+  :root[data-theme="auto"] {
+    --bg: #f4f4f5; --card: #ffffff; --ink: #18181b; --muted: #71717a; --line: #e4e4e7;
+    --acc: #18181b; --soft: #e4e4e7; --onacc: #ffffff; --task: #be123c; --tsoft: #fde4ea;
+    --good: #15803d; --good-soft: #dcf5e4; --warn: #b45309; --warn-soft: #fbead6; --danger: #be123c;
   }
 }
-:root[data-theme="dark"] {
-  --bg: #15171c; --card: #1e2128; --ink: #eceef2; --muted: #98a1ad; --line: #2c313a;
-  --day: #7c9aff; --day-soft: #232c4d; --good: #5fcf7a; --good-soft: #1b3323; --warn: #f0a04b; --warn-soft: #3a2b18;
-  --danger: #f2736b; --accent: #eceef2; --accent-ink: #15171c; --shadow: none;
-}
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; background: var(--bg); color: var(--ink);
-  font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-body { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+body { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
 button { font: inherit; color: inherit; cursor: pointer; }
 input, select, textarea { font: inherit; color: inherit; }
-a { color: var(--day); }
-.wrap { max-width: 560px; margin: 0 auto; padding: calc(12px + env(safe-area-inset-top)) 16px 0; }
+a { color: var(--ink); }
+.wrap { max-width: 560px; margin: 0 auto; padding: calc(10px + env(safe-area-inset-top)) 16px 0; }
 .num { font-variant-numeric: tabular-nums; }
-.muted { color: var(--muted); }
-.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; box-shadow: var(--shadow); }
-.card h3 { margin: 0 0 8px; font-size: 15px; }
-.stack > * + * { margin-top: 12px; }
-
-.topbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
-.datenav { display: flex; align-items: center; gap: 4px; }
-.iconbtn { width: 40px; height: 40px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); font-size: 20px; line-height: 1; }
-.iconbtn:disabled { opacity: .35; cursor: default; }
-.datelabel { min-width: 130px; text-align: center; font-weight: 600; }
-.datelabel small { display: block; font-weight: 400; font-size: 12px; color: var(--muted); }
-.pill { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 6px 12px; font-size: 13px; color: var(--muted); }
+.muted, .mu { color: var(--muted); }
+.mu { font-size: 13px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; }
+.card h3 { margin: 0 0 6px; font-size: 15px; }
+.stack > * + * { margin-top: 10px; }
+.hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin: 6px 2px 8px; }
+.hd h1 { margin: 0; font-size: 22px; font-weight: 600; }
+.pill { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 5px 11px; font-size: 12px; color: var(--muted); white-space: nowrap; }
 .pill.bad { color: var(--danger); border-color: var(--danger); }
+.pills { display: flex; gap: 6px; }
 
-.shape { font-size: 14px; color: var(--muted); margin: 0 0 10px; }
-.shape b { color: var(--ink); }
-.allday { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
-.allday span { background: var(--day-soft); color: var(--day); border-radius: 8px; padding: 4px 10px; font-size: 13px; }
-.ev { display: flex; gap: 12px; width: 100%; text-align: left; background: none; border: 0; border-top: 1px solid var(--line); padding: 12px 2px; align-items: flex-start; }
-.ev:first-of-type { border-top: 0; }
-.ev .t { min-width: 56px; font-weight: 650; font-size: 15px; }
-.ev .t small { display: block; font-weight: 400; font-size: 12px; color: var(--muted); }
-.ev .nm { min-width: 0; flex: 1; }
-.ev .name { display: block; font-weight: 600; overflow-wrap: anywhere; }
-.ev .sub { display: block; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
-.ev.past { opacity: .5; }
-.ev.next { background: var(--day-soft); border-radius: 12px; border-top-color: transparent; padding-left: 10px; padding-right: 10px; margin: 2px -8px; width: calc(100% + 16px); }
+.wk { display: flex; align-items: center; border-bottom: 1px solid var(--line); padding: 2px 0 8px; margin-bottom: 10px; }
+.wk .ar { flex: none; width: 24px; height: 40px; border: 0; background: none; color: var(--muted); font-size: 20px; padding: 0; }
+.wk .wd { flex: 1; border: 0; background: none; text-align: center; font-size: 12px; color: var(--muted); padding: 2px 0; }
+.wk .wd b { display: block; margin: 3px auto 0; font-weight: 400; font-size: 15px; color: var(--ink); width: 36px; height: 36px; line-height: 34px; border-radius: 50%; border: 1px solid transparent; }
+.wk .wd.today b { border-color: var(--muted); }
+.wk .wd.on b { background: var(--acc); color: var(--onacc); font-weight: 600; border-color: var(--acc); }
+.health { margin: 0 2px 8px; font-size: 13px; color: var(--muted); }
+.allday { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.allday span { background: var(--soft); border-radius: 8px; padding: 4px 10px; font-size: 13px; }
+.shape { font-size: 13px; color: var(--muted); margin: 6px 2px 4px; }
+.shape b { color: var(--ink); font-weight: 500; }
+
+.tl { position: relative; margin: 6px 0 4px; user-select: none; -webkit-user-select: none; }
+.tl .hl { position: absolute; left: 46px; right: 0; border-top: 1px solid var(--line); pointer-events: none; }
+.tl .hr { position: absolute; left: 0; font-size: 12px; color: var(--muted); pointer-events: none; }
+.tev { position: absolute; text-align: left; border: 0; border-left: 4px solid var(--acc); background: var(--soft); border-radius: 0 10px 10px 0; padding: 3px 8px; font-size: 13px; overflow: hidden; line-height: 1.25; }
+.tev b { font-weight: 500; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tev span { display: block; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tev.n { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--muted); }
+.tev.past { opacity: .5; }
+.tev.next { box-shadow: 0 0 0 1px var(--acc) inset; }
+.ttk { position: absolute; display: flex; align-items: center; gap: 6px; border: 1px solid var(--task); background: var(--tsoft); border-radius: 10px; padding: 0 8px 0 4px; font-size: 13px; overflow: hidden; }
+.ttk .chk { width: 22px; height: 22px; border-radius: 7px; font-size: 12px; }
+.ttk .nm { flex: 1; min-width: 0; text-align: left; background: none; border: 0; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--task); font-size: 13px; }
+.now { position: absolute; left: 40px; right: 0; border-top: 2px solid var(--task); z-index: 2; pointer-events: none; }
+.now:before { content: ""; position: absolute; left: -4px; top: -5px; width: 8px; height: 8px; border-radius: 50%; background: var(--task); }
 .badge { display: inline-block; border-radius: 6px; padding: 1px 7px; font-size: 11px; margin-left: 6px; vertical-align: 1px; background: var(--warn-soft); color: var(--warn); font-weight: 600; }
-.badge.day { background: var(--day-soft); color: var(--day); }
-.free { font-size: 12px; color: var(--muted); padding: 2px 0 2px 68px; }
+.badge.day { background: var(--soft); color: var(--ink); }
 
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.stat { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
-.stat .lbl { font-size: 12px; color: var(--muted); }
-.stat .val { font-size: 20px; font-weight: 650; margin-top: 2px; }
-.stat .sub { font-size: 12px; color: var(--muted); }
-
-.grouphd { display: flex; justify-content: space-between; align-items: baseline; margin: 14px 2px 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.grouphd { display: flex; justify-content: space-between; align-items: baseline; margin: 10px 2px 2px; font-size: 12px; color: var(--muted); }
 .grouphd:first-child { margin-top: 0; }
 .grouphd.bad { color: var(--danger); }
-.task { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
+.task { display: flex; align-items: center; gap: 12px; padding: 3px 0; border-top: 1px solid var(--line); }
 .task:first-of-type { border-top: 0; }
 .chk { flex: none; width: 28px; height: 28px; border-radius: 9px; border: 2px solid var(--muted); background: none; padding: 0; display: grid; place-items: center; font-size: 15px; line-height: 1; color: transparent; }
-.chk.on { background: var(--good); border-color: var(--good); color: #fff; }
+.chk.on { background: var(--good); border-color: var(--good); color: var(--bg); }
 .task .tt { min-width: 0; flex: 1; text-align: left; background: none; border: 0; padding: 4px 0; }
 .task .tt span { display: block; overflow-wrap: anywhere; }
 .task .tt .sub { font-size: 12px; color: var(--muted); }
 .task.done .tt .tn { text-decoration: line-through; color: var(--muted); }
-.addrow { width: 100%; margin-top: 10px; border: 1px dashed var(--line); background: none; border-radius: 12px; padding: 10px; color: var(--day); font-weight: 600; }
-.empty { color: var(--muted); font-size: 14px; padding: 4px 2px; }
-.nudge { background: var(--day-soft); border-radius: 16px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tray > summary { list-style: none; display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-weight: 600; font-size: 15px; }
+.tray > summary::-webkit-details-marker { display: none; }
+.tray > summary .mini { border: 1px solid var(--line); background: none; border-radius: 999px; padding: 3px 11px; font-size: 13px; font-weight: 600; }
+.tray .body { margin-top: 6px; }
+.addrow { width: 100%; margin-top: 8px; border: 1px dashed var(--line); background: none; border-radius: 12px; padding: 9px; color: var(--ink); font-weight: 600; }
+.empty { color: var(--muted); font-size: 14px; padding: 4px 2px; margin: 0; }
+.nudge { background: var(--soft); border-radius: 16px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .nudge b { display: block; }
 
-.nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--card); border-top: 1px solid var(--line);
-  display: flex; padding-bottom: env(safe-area-inset-bottom); }
-.nav button { flex: 1; border: 0; background: none; padding: 12px 0 14px; font-size: 13px; color: var(--muted); }
-.nav button.on { color: var(--day); font-weight: 650; }
+.nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--card); border-top: 1px solid var(--line); display: flex; padding-bottom: env(safe-area-inset-bottom); }
+.nav button { flex: 1; border: 0; background: none; padding: 8px 0 10px; font-size: 12px; color: var(--muted); position: relative; }
+.nav button i { display: block; font-size: 21px; line-height: 1.2; font-style: normal; }
+.nav button.on { color: var(--ink); font-weight: 600; }
+.nav .nb { position: absolute; top: 3px; left: 56%; background: var(--task); color: var(--bg); font-size: 11px; font-weight: 700; border-radius: 9px; min-width: 17px; height: 17px; line-height: 17px; }
+.fab { position: fixed; right: 18px; bottom: calc(86px + env(safe-area-inset-bottom)); z-index: 5; width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--acc); color: var(--onacc); font-size: 28px; line-height: 1; box-shadow: 0 6px 18px rgba(0,0,0,.35); }
 
-.scrim { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 20; display: flex; align-items: flex-end; justify-content: center; }
-.sheet { width: 100%; max-width: 560px; max-height: 92vh; overflow: auto; background: var(--bg); border-radius: 20px 20px 0 0;
-  padding: 16px 16px calc(20px + env(safe-area-inset-bottom)); }
+.scrim { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 20; display: flex; align-items: flex-end; justify-content: center; }
+.sheet { width: 100%; max-width: 560px; max-height: 92vh; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 20px 20px 0 0; padding: 16px 16px calc(20px + env(safe-area-inset-bottom)); }
 .sheet h2 { margin: 0 0 4px; font-size: 19px; overflow-wrap: anywhere; }
 .row { display: flex; gap: 8px; }
-.field { width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
-.field:focus { outline: 2px solid var(--day); outline-offset: -1px; }
+.field { width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-top: 8px; }
+.field:focus { outline: 2px solid var(--acc); outline-offset: -1px; }
 textarea.field { min-height: 92px; resize: vertical; }
-.btn { border: 0; border-radius: 12px; background: var(--accent); color: var(--accent-ink); padding: 12px 18px; font-weight: 650; text-decoration: none; display: inline-block; }
-.btn.day { background: var(--day); color: #fff; }
-.btn.ghost { background: var(--card); color: var(--ink); border: 1px solid var(--line); }
+.btn { border-radius: 12px; background: var(--card); color: var(--ink); border: 1px solid var(--line); padding: 12px 18px; font-weight: 600; text-decoration: none; display: inline-block; }
+.btn.day { background: var(--acc); color: var(--onacc); border-color: var(--acc); }
 .btn:disabled { opacity: .4; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .chip { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 7px 13px; font-size: 14px; }
-.chip.on { background: var(--day); color: #fff; border-color: var(--day); }
+.chip.on { background: var(--acc); color: var(--onacc); border-color: var(--acc); }
 .lbl2 { font-size: 13px; color: var(--muted); margin: 14px 2px 6px; display: block; }
+.ck2 { display: flex; align-items: center; gap: 10px; margin: 12px 2px 0; font-size: 15px; }
+.ck2 input { width: 20px; height: 20px; accent-color: var(--acc); }
 .people { font-size: 14px; margin: 4px 0; }
 .people .r { display: inline-block; width: 18px; color: var(--muted); }
 .desc { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; max-height: 220px; overflow: auto; }
+.menu { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-top: 8px; text-decoration: none; color: var(--ink); }
+.menu i { font-size: 22px; font-style: normal; width: 26px; text-align: center; }
+.menu small { display: block; color: var(--muted); font-size: 12px; }
+
+.mail { display: flex; align-items: stretch; background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-top: 8px; }
+.mail a.mb { flex: 1; min-width: 0; text-decoration: none; color: var(--ink); padding: 10px 6px 10px 14px; }
+.mail .l1 { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
+.mail .l1 b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mail .l1 span { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.mail .l2 { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mail .l3 { font-size: 13px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mail .mt { flex: none; width: 60px; border: 0; border-left: 1px solid var(--line); background: none; color: var(--muted); font-size: 12px; }
+.thread { display: block; text-decoration: none; padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.thread:first-of-type { border-top: 0; }
 
 .moods { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
 .moods button { border: 1px solid var(--line); background: var(--card); border-radius: 14px; padding: 10px 0 6px; font-size: 26px; line-height: 1.1; }
 .moods button small { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
-.moods button.on { border-color: var(--day); background: var(--day-soft); box-shadow: 0 0 0 1px var(--day) inset; }
+.moods button.on { border-color: var(--acc); box-shadow: 0 0 0 1px var(--acc) inset; background: var(--soft); }
 .scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-.scale button { border: 1px solid var(--line); background: var(--card); border-radius: 12px; padding: 10px 0; font-weight: 650; }
-.scale button.on { border-color: var(--day); background: var(--day); color: #fff; }
+.scale button { border: 1px solid var(--line); background: var(--card); border-radius: 12px; padding: 10px 0; font-weight: 600; }
+.scale button.on { border-color: var(--acc); background: var(--acc); color: var(--onacc); }
 .scalehint { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 3px; }
 .saved { font-size: 12px; color: var(--muted); text-align: right; min-height: 16px; }
-.facts li { margin: 3px 0; }
 .facts ul { margin: 4px 0 8px; padding-left: 18px; font-size: 14px; }
-
+.facts li { margin: 3px 0; }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--card); }
 .seg button { border: 0; background: none; padding: 8px 14px; font-size: 14px; color: var(--muted); }
-.seg button.on { background: var(--ink); color: var(--bg); font-weight: 650; }
+.seg button.on { background: var(--acc); color: var(--onacc); font-weight: 600; }
 .hrow { display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; background: none; border: 0; border-top: 1px solid var(--line); padding: 12px 2px; }
 .hrow:first-of-type { border-top: 0; }
 .hrow .em { font-size: 26px; width: 34px; text-align: center; }
-.hrow .hd { font-weight: 600; }
-.hrow .sub { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.hrow .hd2 { font-weight: 600; }
+.hrow .sub { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; display: block; }
 .kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 15px; }
 .kv .k { color: var(--muted); }
 svg text { fill: var(--muted); font-size: 10px; font-family: inherit; }
+.back { border: 0; background: none; color: var(--muted); font-size: 14px; padding: 4px 0; }
 
 .set h3 { margin: 0 0 8px; font-size: 15px; }
 .set p { margin: 6px 0; font-size: 14px; }
 .errbox { background: var(--warn-soft); border-radius: 10px; padding: 10px 12px; font-size: 13px; word-break: break-word; margin-top: 8px; }
 .okbox { background: var(--good-soft); border-radius: 10px; padding: 10px 12px; font-size: 13px; word-break: break-word; margin-top: 8px; }
-.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 30; max-width: 92vw;
-  background: var(--ink); color: var(--bg); border-radius: 12px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; font-size: 14px; }
-.toast button { background: none; border: 0; color: var(--day); font-weight: 700; padding: 0; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(100px + env(safe-area-inset-bottom)); z-index: 30; max-width: 92vw; background: var(--ink); color: var(--bg); border-radius: 12px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; font-size: 14px; }
+.toast button { background: none; border: 0; color: var(--bg); font-weight: 700; text-decoration: underline; padding: 0; }
 [hidden] { display: none !important; }
 </style>
 </head>
 <body>
 <div class="wrap" id="app"></div>
 <nav class="nav" id="nav"></nav>
+<div id="fabslot"></div>
 <div id="overlay"></div>
 <div id="toast"></div>
 
 <script>
 'use strict';
-const BUILD = '2026-10-31.1';
+const BUILD = '2026-11-02.1';
 const STORE_KEY = 'myday.v1';
+const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
+const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
 const MOODS = [['😞', 'Rough'], ['🙁', 'Meh'], ['😐', 'Okay'], ['🙂', 'Good'], ['😄', 'Great']];
 const BASE_TAGS = ['Work', 'Sport', 'Social', 'Family', 'Errands', 'Learning', 'Rest', 'Travel', 'Outdoors', 'Creative'];
-const WORK_START = 9, WORK_END = 18; // the window used to find your longest free block
+const WORK_START = 9, WORK_END = 18; // window used to find your longest free block
+const HH = 52, LW = 46; // timeline: pixels per hour, width of the hour labels
 
 /* ---------- helpers ---------- */
 const $ = id => document.getElementById(id);
@@ -172,27 +196,38 @@ function ymd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
 function parseYmd(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
 function addDays(s, n) { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); }
 const today = () => ymd(new Date());
+function weekStart(s) { return addDays(s, -((parseYmd(s).getDay() + 6) % 7)); }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function fmt(n) { return Math.round(n).toLocaleString(); }
 function dur(min) { const h = Math.floor(min / 60), m = Math.round(min % 60); return h ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`; }
 const timeStr = iso => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 function dayLabel(s) {
   const t = today();
-  if (s === t) return 'Today';
-  if (s === addDays(t, 1)) return 'Tomorrow';
-  if (s === addDays(t, -1)) return 'Yesterday';
+  if (s === t) return 'Today'; if (s === addDays(t, 1)) return 'Tomorrow'; if (s === addDays(t, -1)) return 'Yesterday';
   return parseYmd(s).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
 }
 const longDate = s => parseYmd(s).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
 const shortDate = s => parseYmd(s).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
 const evKey = e => `${e.uid}|${e.start}`;
 const dueDay = t => (t.due ? t.due.slice(0, 10) : null);
+const hasTime = t => !!t.due && t.due.includes('T');
 const linkify = s => esc(s).replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]])/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+const minutesIn = (date, iso) => (Date.parse(iso) - parseYmd(date).getTime()) / 6e4; // minutes since midnight of `date`
+const hm = m => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(Math.round(m % 60)).padStart(2, '0')}`;
+function untilStr(ms) { const m = Math.max(1, Math.round(ms / 6e4)); return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`; }
+function ago(d) {
+  const n = Math.round((Date.now() - Date.parse(d)) / 864e5);
+  return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n < 14 ? `${n} days ago` : n < 60 ? `${Math.round(n / 7)} weeks ago` : `${Math.round(n / 30)} months ago`;
+}
+function mailTime(ms) {
+  const d = new Date(ms);
+  return ymd(d) === today() ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString([], { day: 'numeric', month: 'short' });
+}
 
 /* ---------- state ---------- */
-function blank() { return { reviews: {}, prep: {}, health: {}, cache: {}, tasks: null, tags: [], settings: { baseUrl: '', appKey: '' }, status: {}, healthAt: 0, demo: false }; }
+function blank() { return { reviews: {}, prep: {}, health: {}, cache: {}, tasks: null, inbox: null, tags: [], settings: { baseUrl: '', appKey: '', theme: 'dark' }, status: {}, healthAt: 0, demo: false }; }
 function load() {
-  try { return Object.assign(blank(), JSON.parse(localStorage.getItem(STORE_KEY) || '{}')); }
+  try { const o = JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); const s = Object.assign(blank(), o); s.settings = Object.assign(blank().settings, o.settings); return s; }
   catch { return blank(); }
 }
 function save() {
@@ -203,14 +238,17 @@ let S = load();
 let view = 'today';
 let viewDate = today();
 let reviewDate = new Date().getHours() < 12 ? addDays(today(), -1) : today(); // mornings default to logging yesterday
-let histDays = 30;
-let loading = false;
+let histDays = 30, mailFilter = 'all', loading = false, didScroll = false;
+
+function applyTheme() {
+  const t = ['dark', 'light', 'auto'].includes(S.settings.theme) ? S.settings.theme : 'dark';
+  document.documentElement.dataset.theme = t;
+  const light = t === 'light' || (t === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches);
+  $('themeColor').setAttribute('content', light ? '#f4f4f5' : '#111113');
+}
 
 /* ---------- Worker access ---------- */
-function baseUrl() {
-  const b = (S.settings.baseUrl || '').trim().replace(/\/$/, '');
-  return /^https?:\/\//.test(b) ? b : null;
-}
+function baseUrl() { const b = (S.settings.baseUrl || '').trim().replace(/\/$/, ''); return /^https?:\/\//.test(b) ? b : null; }
 async function api(path, opts = {}) {
   const base = baseUrl();
   if (base === null) throw new Error('Enter your Worker address in Settings first (it starts with https://).');
@@ -223,11 +261,12 @@ async function api(path, opts = {}) {
   return body;
 }
 const connected = () => !!(S.settings.appKey && baseUrl()) && !S.demo;
+const post = (path, b) => api(path, { method: 'POST', body: JSON.stringify(b) });
 
 // Load everything for one day. Each part can fail on its own; whatever worked is kept and the rest keeps its saved copy.
 async function loadDay(date) {
   if (!connected()) return;
-  loading = true; if (view !== 'settings') render();
+  loading = true; if (view === 'today' || view === 'review') render();
   const from = parseYmd(date).toISOString(), to = parseYmd(addDays(date, 1)).toISOString();
   const [cal, tasks, health] = await Promise.allSettled([
     api(`/api/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
@@ -246,149 +285,257 @@ async function loadDay(date) {
   } else S.status.tasks = { at, ok: false, message: tasks.reason.message };
   if (health.status === 'fulfilled') { mergeHealth(health.value); S.status.health = { at, ok: !health.value.errors?.length, message: (health.value.errors || []).map(e => `${e.type}: ${e.message}`).join('\n') }; }
   else S.status.health = { at, ok: false, message: health.reason.message };
-  for (const d of Object.keys(S.cache).sort().slice(0, -14)) delete S.cache[d]; // keep the 14 most recent days
+  for (const d of Object.keys(S.cache).sort().slice(0, -21)) delete S.cache[d]; // keep the 21 most recent days
   loading = false; save(); render();
 }
-function mergeHealth(out) {
-  for (const [d, v] of Object.entries(out.days || {})) S.health[d] = Object.assign(S.health[d] || {}, v);
-  S.healthAt = Date.now();
-}
+function mergeHealth(out) { for (const [d, v] of Object.entries(out.days || {})) S.health[d] = Object.assign(S.health[d] || {}, v); S.healthAt = Date.now(); }
 async function syncHealth(days) {
   if (!connected()) return;
-  try {
-    const to = today();
-    mergeHealth(await api(`/api/days?from=${addDays(to, -(days - 1))}&to=${to}`));
-    S.status.health = { at: Date.now(), ok: true, message: '' };
-  } catch (e) { S.status.health = { at: Date.now(), ok: false, message: e.message }; }
+  try { const to = today(); mergeHealth(await api(`/api/days?from=${addDays(to, -(days - 1))}&to=${to}`)); S.status.health = { at: Date.now(), ok: true, message: '' }; }
+  catch (e) { S.status.health = { at: Date.now(), ok: false, message: e.message }; }
+  save(); render();
+}
+async function loadInbox() {
+  if (!connected()) return;
+  try { const r = await api('/api/mail/inbox'); S.inbox = { at: Date.now(), account: r.account, unread: r.unread, messages: r.messages }; S.status.mail = { at: Date.now(), ok: true, message: '' }; }
+  catch (e) { S.status.mail = { at: Date.now(), ok: false, message: e.message }; }
   save(); render();
 }
 
 /* ---------- day shape ---------- */
-function mergedBusy(events, date) {
-  const lo = parseYmd(date).getTime() + WORK_START * 36e5, hi = parseYmd(date).getTime() + WORK_END * 36e5;
-  const iv = events.filter(e => !e.allDay && e.busy).map(e => [Math.max(lo, Date.parse(e.start)), Math.min(hi, Date.parse(e.end))]).filter(([a, b]) => b > a).sort((a, b) => a[0] - b[0]);
-  const out = [];
-  for (const x of iv) { if (out.length && x[0] <= out.at(-1)[1]) out.at(-1)[1] = Math.max(out.at(-1)[1], x[1]); else out.push([...x]); }
-  return { out, lo, hi };
-}
 function dayShape(events, date) {
   const timed = events.filter(e => !e.allDay);
   if (!timed.length) return null;
-  const mins = timed.filter(e => e.busy).reduce((a, e) => a + (Date.parse(e.end) - Date.parse(e.start)) / 6e4, 0);
-  const { out, lo, hi } = mergedBusy(events, date);
+  const lo = parseYmd(date).getTime() + WORK_START * 36e5, hi = parseYmd(date).getTime() + WORK_END * 36e5;
+  const iv = timed.filter(e => e.busy).map(e => [Math.max(lo, Date.parse(e.start)), Math.min(hi, Date.parse(e.end))]).filter(([a, b]) => b > a).sort((a, b) => a[0] - b[0]);
+  const merged = [];
+  for (const x of iv) { if (merged.length && x[0] <= merged.at(-1)[1]) merged.at(-1)[1] = Math.max(merged.at(-1)[1], x[1]); else merged.push([...x]); }
   let best = null, cur = lo;
-  for (const [a, b] of [...out, [hi, hi]]) { if (a - cur > (best ? best[1] - best[0] : 0)) best = [cur, a]; cur = Math.max(cur, b); }
-  return { count: timed.length, mins, first: timed[0].start, last: timed.at(-1).end, free: best && best[1] - best[0] >= 30 * 6e4 ? best : null };
+  for (const [a, b] of [...merged, [hi, hi]]) { if (a - cur > (best ? best[1] - best[0] : 0)) best = [cur, a]; cur = Math.max(cur, b); }
+  const mins = timed.filter(e => e.busy).reduce((a, e) => a + (Date.parse(e.end) - Date.parse(e.start)) / 6e4, 0);
+  return { count: timed.length, mins, free: best && best[1] - best[0] >= 30 * 6e4 ? best : null };
 }
 
 /* ---------- rendering ---------- */
+const NAV = [['today', 'Day', '▦'], ['inbox', 'Inbox', '✉'], ['review', 'Review', '☺'], ['more', 'More', '≡']];
 function render() {
-  $('nav').innerHTML = [['today', 'Day ahead'], ['review', 'Review'], ['history', 'History'], ['settings', 'Settings']]
-    .map(([k, l]) => `<button data-v="${k}" class="${view === k ? 'on' : ''}">${l}</button>`).join('');
+  const active = { history: 'more', settings: 'more' }[view] || view, unread = S.inbox ? S.inbox.unread : 0;
+  $('nav').innerHTML = NAV.map(([k, l, ic]) => `<button data-v="${k}" class="${active === k ? 'on' : ''}"><i>${ic}</i>${l}${k === 'inbox' && unread ? `<span class="nb">${unread > 99 ? '99+' : unread}</span>` : ''}</button>`).join('');
   $('nav').querySelectorAll('button').forEach(b => b.onclick = () => go(b.dataset.v));
+  $('fabslot').innerHTML = view === 'today' ? '<button class="fab" data-act="fab" aria-label="Add">+</button>' : '';
   const app = $('app');
-  app.innerHTML = view === 'today' ? aheadHtml() : view === 'review' ? reviewHtml() : view === 'history' ? historyHtml() : settingsHtml();
-  bind(app);
+  app.innerHTML = { today: dayHtml, inbox: inboxHtml, review: reviewHtml, more: moreHtml, history: historyHtml, settings: settingsHtml }[view]();
+  bind(app); bind($('fabslot'));
+  if (view === 'today' && viewDate === today() && !didScroll) {
+    const n = document.querySelector('.now');
+    if (n) { didScroll = true; window.scrollTo(0, Math.max(0, n.getBoundingClientRect().top + window.scrollY - 260)); }
+  }
 }
 function go(v) {
   view = v; render(); window.scrollTo(0, 0);
   if (v === 'review') loadDay(reviewDate);
   if (v === 'today') loadDay(viewDate);
+  if (v === 'inbox') loadInbox();
 }
-function pill() {
-  if (!connected() && !S.demo) return `<button class="pill" data-act="goto-settings">Not connected</button>`;
-  if (S.demo) return `<span class="pill">Demo data</span>`;
-  if (loading) return `<span class="pill">Updating…</span>`;
-  const bad = ['cal', 'tasks', 'health'].filter(k => S.status[k] && !S.status[k].ok);
-  if (bad.length) return `<button class="pill bad" data-act="goto-settings">${bad.length} problem${bad.length > 1 ? 's' : ''} · details</button>`;
-  const at = Math.max(0, ...['cal', 'tasks'].map(k => (S.status[k] || {}).at || 0));
-  return `<button class="pill" data-act="refresh">${at ? 'Updated ' + new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Refresh'}</button>`;
-}
-function dateBar(date, prevAct, nextAct) {
-  return `<div class="topbar"><div class="datenav">
-    <button class="iconbtn" data-act="${prevAct}" aria-label="Previous day">‹</button>
-    <div class="datelabel">${dayLabel(date)}<small>${date === today() || ['Yesterday', 'Tomorrow'].includes(dayLabel(date)) ? longDate(date) : parseYmd(date).getFullYear()}</small></div>
-    <button class="iconbtn" data-act="${nextAct}" aria-label="Next day">›</button></div>${pill()}</div>`;
+function pill(extra = '') {
+  let p;
+  if (S.demo) p = `<span class="pill">Demo data</span>`;
+  else if (!connected()) p = `<button class="pill" data-act="goto-settings">Not connected</button>`;
+  else if (loading) p = `<span class="pill">Updating…</span>`;
+  else {
+    const bad = ['cal', 'tasks', 'health', 'mail'].filter(k => S.status[k] && !S.status[k].ok);
+    const at = Math.max(0, ...['cal', 'tasks'].map(k => (S.status[k] || {}).at || 0));
+    p = bad.length ? `<button class="pill bad" data-act="goto-settings">${bad.length} problem${bad.length > 1 ? 's' : ''} · details</button>`
+      : `<button class="pill" data-act="refresh">${at ? 'Updated ' + new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Refresh'}</button>`;
+  }
+  return `<span class="pills">${extra}${p}</span>`;
 }
 
-/* ----- day ahead ----- */
-function healthTiles(date) {
-  const h = S.health[date] || {}, y = S.health[addDays(date, -1)] || {};
-  const t = [];
-  if (h.sleepMinutes != null) t.push(['Sleep', dur(h.sleepMinutes), h.sleepDeepMin != null ? `deep ${Math.round(h.sleepDeepMin)}m · REM ${Math.round(h.sleepRemMin || 0)}m` : '']);
-  if (h.restingHr != null) t.push(['Resting HR', Math.round(h.restingHr), 'bpm']);
-  if (y.steps != null) t.push(['Steps', fmt(y.steps), 'the day before']);
-  return t.length ? `<div class="stats">${t.map(([l, v, s]) => `<div class="stat"><div class="lbl">${l}</div><div class="val num">${v}</div><div class="sub">${esc(s) || '&nbsp;'}</div></div>`).join('')}</div>` : '';
+/* ----- day (timeline) ----- */
+function weekHtml(date) {
+  const mon = weekStart(date), t = today();
+  const days = [0, 1, 2, 3, 4, 5, 6].map(i => addDays(mon, i));
+  return `<div class="wk"><button class="ar" data-act="wprev" aria-label="Previous week">‹</button>${days.map(d => `<button class="wd ${d === date ? 'on' : ''} ${d === t ? 'today' : ''}" data-day="${d}">${parseYmd(d).toLocaleDateString([], { weekday: 'narrow' })}<b>${parseYmd(d).getDate()}</b></button>`).join('')}<button class="ar" data-act="wnext" aria-label="Next week">›</button></div>`;
 }
-function eventRow(e, nextKey, now) {
-  const ended = Date.parse(e.end) <= now, dm = (Date.parse(e.end) - Date.parse(e.start)) / 6e4;
-  const bits = [e.location && esc(e.location.split('\n')[0]), e.video && 'Video call', e.attendeeCount > 1 && `${e.attendeeCount} people`].filter(Boolean).join(' · ');
-  const badge = e.response === 'tentative' ? '<span class="badge">maybe</span>' : e.response === 'needsAction' ? '<span class="badge">no reply</span>' : '';
-  return `<button class="ev ${ended && viewDate === today() ? 'past' : ''} ${evKey(e) === nextKey ? 'next' : ''}" data-ev="${esc(evKey(e))}">
-    <span class="t num">${timeStr(e.start)}<small>${dur(dm)}</small></span>
-    <span class="nm"><span class="name">${esc(e.title)}${badge}${evKey(e) === nextKey ? '<span class="badge day">next</span>' : ''}</span>${bits ? `<span class="sub">${bits}</span>` : ''}</span></button>`;
-}
-function scheduleCard(date) {
-  const c = S.cache[date], st = S.status.cal;
-  if (!c) return `<div class="card"><h3>Schedule</h3><p class="empty">${connected() ? (loading ? 'Loading your calendar…' : st && !st.ok ? esc(st.message) : 'Nothing loaded yet.') : 'Connect Google in Settings to see your meetings.'}</p></div>`;
-  const ev = c.events, now = Date.now(), timed = ev.filter(e => !e.allDay);
-  const nextKey = date === today() ? (timed.find(e => Date.parse(e.end) > now) ? evKey(timed.find(e => Date.parse(e.end) > now)) : null) : null;
-  const sh = dayShape(ev, date);
-  const stale = st && !st.ok ? `<div class="errbox">Could not refresh: ${esc(st.message)}<br>Showing the copy from ${new Date(c.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.</div>` : '';
-  let rows = '';
-  timed.forEach((e, i) => {
-    rows += eventRow(e, nextKey, now);
-    const nx = timed[i + 1];
-    if (nx && Date.parse(nx.start) - Date.parse(e.end) >= 45 * 6e4) rows += `<div class="free">${dur((Date.parse(nx.start) - Math.max(Date.parse(e.end), 0)) / 6e4)} free</div>`;
-  });
-  return `<div class="card"><h3>Schedule</h3>
-    ${sh ? `<p class="shape"><b>${sh.count} meeting${sh.count > 1 ? 's' : ''}</b> · ${dur(sh.mins)} booked · ${timeStr(sh.first)} to ${timeStr(sh.last)}${sh.free ? ` · longest free block <b>${timeStr(sh.free[0])}–${timeStr(sh.free[1])}</b>` : ''}</p>` : ''}
-    ${ev.filter(e => e.allDay).length ? `<div class="allday">${ev.filter(e => e.allDay).map(e => `<span>${esc(e.title)}</span>`).join('')}</div>` : ''}
-    ${rows || (ev.filter(e => e.allDay).length ? '' : '<p class="empty">Nothing in your calendar. Enjoy the open day.</p>')}
-    ${stale}${c.errors && c.errors.length ? `<div class="errbox">Some calendars could not be read: ${esc(c.errors.map(e => e.calendar).join(', '))}</div>` : ''}</div>`;
+function healthLine(d) {
+  const h = S.health[d] || {}, y = S.health[addDays(d, -1)] || {};
+  const p = [h.sleepMinutes != null && `Slept ${dur(h.sleepMinutes)}`, h.restingHr != null && `resting ${Math.round(h.restingHr)} bpm`, y.steps != null && `${fmt(y.steps)} steps the day before`].filter(Boolean);
+  return p.length ? `<p class="health">${p.join(' · ')}</p>` : '';
 }
 function bucketTasks(open, date) {
-  const soonEnd = addDays(date, 3), b = { overdue: [], today: [], waiting: [], progress: [], soon: [], nodate: [], later: 0 };
-  for (const t of open) {
-    const d = dueDay(t);
-    if (t.waiting) b.waiting.push(t);
-    else if (d && d < date) b.overdue.push(t);
-    else if (d === date) b.today.push(t);
-    else if (t.status === 'In progress') b.progress.push(t);
-    else if (d && d <= soonEnd) b.soon.push(t);
-    else if (!d) b.nodate.push(t);
-    else b.later++;
+  const t = today(), soonEnd = addDays(date, 3), b = { overdue: [], onDay: [], timed: [], waiting: [], progress: [], soon: [], nodate: [], later: 0 };
+  for (const x of open) {
+    const d = dueDay(x);
+    if (x.waiting) b.waiting.push(x);
+    else if (d === date && hasTime(x)) b.timed.push(x);
+    else if (d === date) b.onDay.push(x);
+    else if (d && d < date && date === t) b.overdue.push(x);
+    else if (x.status === 'In progress') b.progress.push(x);
+    else if (d && d > date && d <= soonEnd) b.soon.push(x);
+    else if (!d) b.nodate.push(x);
+    else if (d > date) b.later++;
   }
   return b;
 }
 function taskRow(t, done) {
-  const d = dueDay(t), meta = [d && d !== today() ? `due ${shortDate(d)}` : '', t.types.join(', '), t.crm ? 'CRM' : '', t.status === 'In progress' ? 'in progress' : ''].filter(Boolean).join(' · ');
+  const d = dueDay(t), meta = [d && d !== viewDate ? `due ${shortDate(d)}` : '', t.types.join(', '), t.crm ? 'CRM' : '', t.status === 'In progress' ? 'in progress' : ''].filter(Boolean).join(' · ');
   return `<div class="task ${done ? 'done' : ''}"><button class="chk ${done ? 'on' : ''}" data-done="${t.id}" aria-label="${done ? 'Mark not done' : 'Mark done'}">✓</button>
     <button class="tt" data-task="${t.id}"><span class="tn">${esc(t.title)}</span>${meta ? `<span class="sub">${esc(meta)}</span>` : ''}</button></div>`;
 }
-function tasksCard(date) {
+function trayHtml(date, b) {
   const st = S.status.tasks, T = S.tasks;
-  if (!T) return `<div class="card"><h3>To-dos</h3><p class="empty">${connected() ? (loading ? 'Loading your tasks…' : st && !st.ok ? esc(st.message) : 'Nothing loaded yet.') : 'Connect in Settings to see your Notion tasks.'}</p></div>`;
-  const b = bucketTasks(T.open, date), done = (T.doneOn[today()] || []);
+  if (!T) return `<div class="card"><h3>To-dos</h3><p class="empty">${connected() ? (loading ? 'Loading your tasks…' : st && !st.ok ? esc(st.message) : 'Nothing loaded yet.') : 'Connect in Settings to see your Notion tasks.'}</p><button class="addrow" data-act="add-task">+ Add task</button></div>`;
   const grp = (label, list, cls = '') => list.length ? `<div class="grouphd ${cls}"><span>${label}</span><span>${list.length}</span></div>${list.map(t => taskRow(t)).join('')}` : '';
-  const shown = b.overdue.length + b.today.length + b.progress.length + b.soon.length + b.waiting.length;
-  return `<div class="card"><h3>To-dos</h3>
-    ${grp('Overdue', b.overdue, 'bad')}${grp(date === today() ? 'Due today' : 'Due ' + dayLabel(date).toLowerCase(), b.today)}${grp('In progress', b.progress)}${grp('Next three days', b.soon)}${grp('Waiting on others', b.waiting)}
-    ${shown ? '' : '<p class="empty">Nothing due. Clear day.</p>'}
-    ${b.nodate.length ? `<details style="margin-top:10px"><summary class="muted" style="font-size:14px;cursor:pointer">${b.nodate.length} without a date</summary>${b.nodate.map(t => taskRow(t)).join('')}</details>` : ''}
-    ${b.later ? `<p class="muted" style="font-size:12px;margin:8px 0 0">${b.later} more due later.</p>` : ''}
-    ${done.length && date === today() ? `<div class="grouphd"><span>Done today</span><span>${done.length}</span></div>${done.map(t => taskRow(t, true)).join('')}` : ''}
-    <button class="addrow" data-act="add-task">+ Add task</button>
-    ${st && !st.ok ? `<div class="errbox">Could not refresh: ${esc(st.message)}</div>` : ''}</div>`;
+  const top = b.overdue.length + b.onDay.length + b.timed.length, more = b.progress.length + b.soon.length + b.waiting.length + b.nodate.length;
+  const done = date === today() ? (T.doneOn[today()] || []) : [];
+  const open = S.settings.trayOpen !== false;
+  return `<details class="card tray" id="tray" ${open ? 'open' : ''}><summary><span>To-dos · ${top}${b.timed.length ? ` <span class="muted" style="font-weight:400;font-size:13px">(${b.timed.length} on the timeline)</span>` : ''}</span><button class="mini" data-act="add-task">+ Add</button></summary>
+    <div class="body">
+    ${grp('Overdue', b.overdue, 'bad')}${grp(date === today() ? 'Due today' : 'Due ' + dayLabel(date).toLowerCase(), b.onDay)}
+    ${top - b.timed.length ? '' : `<p class="empty">${b.timed.length ? 'Everything else is on the timeline below.' : 'Nothing due. Clear day.'}</p>`}
+    ${more + done.length ? `<details style="margin-top:8px"><summary class="muted" style="font-size:14px;cursor:pointer">${more ? `${more} more: in progress, soon, waiting, no date` : ''}${more && done.length ? ' · ' : ''}${done.length ? `${done.length} done today` : ''}</summary>${grp('In progress', b.progress)}${grp('Next three days', b.soon)}${grp('Waiting on others', b.waiting)}${grp('No date', b.nodate)}${done.length ? `<div class="grouphd"><span>Done today</span><span>${done.length}</span></div>${done.map(t => taskRow(t, true)).join('')}` : ''}</details>` : ''}
+    ${st && !st.ok ? `<div class="errbox">Could not refresh: ${esc(st.message)}</div>` : ''}</div></details>`;
 }
-function aheadHtml() {
-  const y = addDays(today(), -1), needReview = viewDate === today() && !(S.reviews[y] && (S.reviews[y].mood || S.reviews[y].did)) && new Date().getHours() < 14;
-  return `${dateBar(viewDate, 'prev', 'next')}<div class="stack">
+// Side-by-side lanes for overlapping items.
+function layoutLanes(items) {
+  const sorted = items.slice().sort((a, b) => a.s - b.s || b.e - a.e), clusters = [];
+  let cur = null;
+  for (const it of sorted) {
+    if (!cur || it.s >= cur.end) { cur = { end: it.e, items: [], lanes: [] }; clusters.push(cur); }
+    cur.end = Math.max(cur.end, it.e);
+    let l = cur.lanes.findIndex(x => x <= it.s);
+    if (l < 0) { l = cur.lanes.length; cur.lanes.push(it.e); } else cur.lanes[l] = it.e;
+    it.lane = l; cur.items.push(it);
+  }
+  clusters.forEach(c => c.items.forEach(it => { it.n = c.lanes.length; }));
+  return sorted;
+}
+function timelineHtml(date, timed, tasks) {
+  const isToday = date === today(), now = Date.now(), nowM = (now - parseYmd(date).getTime()) / 6e4;
+  const items = [
+    ...timed.map(ev => { const s = Math.max(0, minutesIn(date, ev.start)); return { ev, s, e: Math.max(s + 15, Math.min(1440, minutesIn(date, ev.end))) }; }),
+    ...tasks.map(t => { const s = Math.max(0, minutesIn(date, t.due)); return { t, s, e: s + 30 }; }),
+  ];
+  let lo = 8, hi = 18;
+  for (const i of items) { lo = Math.min(lo, Math.floor(i.s / 60)); hi = Math.max(hi, Math.ceil(i.e / 60)); }
+  if (isToday) { lo = Math.min(lo, Math.floor(nowM / 60)); hi = Math.max(hi, Math.ceil(nowM / 60) + 1); }
+  lo = Math.max(0, Math.min(lo, 23)); hi = Math.min(24, Math.max(hi, lo + 1));
+  const y = m => (m - lo * 60) / 60 * HH, nextEv = isToday ? timed.find(e => Date.parse(e.end) > now) : null;
+  let html = '';
+  for (let h = lo; h <= hi; h++) html += `<div class="hl" style="top:${(h - lo) * HH}px"></div>${h < hi ? `<div class="hr" style="top:${(h - lo) * HH + 3}px">${String(h).padStart(2, '0')}:00</div>` : ''}`;
+  for (const it of layoutLanes(items)) {
+    const top = y(it.s), pos = `left:calc(${LW}px + (100% - ${LW}px) * ${it.lane} / ${it.n});width:calc((100% - ${LW}px) / ${it.n} - 4px);`;
+    if (it.ev) {
+      const e = it.ev, h = Math.max(24, y(it.e) - top - 2), tight = h < 40, past = isToday && Date.parse(e.end) <= now;
+      const sub = tight ? '' : `<span>${timeStr(e.start)}–${timeStr(e.end)}${e.location ? ' · ' + esc(e.location.split('\n')[0]) : ''}${e.attendeeCount > 1 ? ` · ${e.attendeeCount} people` : ''}</span>`;
+      html += `<button class="tev ${e.busy ? '' : 'n'} ${past ? 'past' : ''} ${nextEv === e ? 'next' : ''}" data-ev="${esc(evKey(e))}" style="top:${top}px;height:${h}px;${pos}"><b>${esc(e.title)}${tight ? ' · ' + timeStr(e.start) : ''}</b>${sub}</button>`;
+    } else {
+      const t = it.t;
+      html += `<div class="ttk" style="top:${top}px;height:30px;${pos}"><button class="chk" data-done="${t.id}" aria-label="Mark done">✓</button><button class="nm" data-task="${t.id}">${esc(t.title)} · ${hm(it.s)}</button></div>`;
+    }
+  }
+  if (isToday) html += `<div class="now" style="top:${y(nowM)}px"></div>`;
+  return `<div class="tl" data-start="${lo}" style="height:${(hi - lo) * HH}px">${html}</div>`;
+}
+function dayHtml() {
+  const d = viewDate, isToday = d === today(), c = S.cache[d], ev = c ? c.events : [], now = Date.now();
+  const timed = ev.filter(e => !e.allDay), allDay = ev.filter(e => e.allDay), upcoming = isToday ? timed.find(e => Date.parse(e.end) > now) : null;
+  const sub = isToday ? (upcoming ? (Date.parse(upcoming.start) <= now ? `Now: ${upcoming.title}` : `Next: ${upcoming.title} in ${untilStr(Date.parse(upcoming.start) - now)}`) : (timed.length ? 'Nothing more today' : 'No meetings today'))
+    : (timed.length ? `${timed.length} meeting${timed.length > 1 ? 's' : ''}` : 'No meetings');
+  const b = bucketTasks(S.tasks ? S.tasks.open : [], d), sh = c ? dayShape(ev, d) : null;
+  const y = addDays(today(), -1), needReview = isToday && !(S.reviews[y] && (S.reviews[y].mood || S.reviews[y].did)) && new Date().getHours() < 14;
+  const stale = S.status.cal && !S.status.cal.ok && c ? `<div class="errbox">Could not refresh the calendar: ${esc(S.status.cal.message)}<br>Showing the copy from ${new Date(c.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.</div>` : '';
+  const calMsg = !c ? `<p class="empty">${connected() ? (loading ? 'Loading your calendar…' : S.status.cal && !S.status.cal.ok ? esc(S.status.cal.message) : 'Nothing loaded yet.') : 'Connect Google in Settings to see your meetings.'}</p>` : '';
+  return `<div class="hd"><div><h1>${longDate(d)}</h1><div class="mu">${esc(sub)}</div></div>${pill(isToday ? '' : '<button class="pill" data-act="today">Today</button>')}</div>
+    ${weekHtml(d)}
+    <div class="stack">
     ${needReview ? `<div class="nudge"><span><b>How was yesterday?</b><span class="muted" style="font-size:14px">30 seconds to log it.</span></span><button class="btn day" data-act="review-yesterday">Log it</button></div>` : ''}
-    ${healthTiles(viewDate)}${scheduleCard(viewDate)}${tasksCard(viewDate)}</div>`;
+    ${isToday ? healthLine(d) : ''}
+    ${allDay.length ? `<div class="allday">${allDay.map(e => `<span>${esc(e.title)}</span>`).join('')}</div>` : ''}
+    ${trayHtml(d, b)}
+    ${sh ? `<p class="shape"><b>${sh.count} meeting${sh.count > 1 ? 's' : ''}</b> · ${dur(sh.mins)} booked${sh.free ? ` · longest free block <b>${timeStr(sh.free[0])}–${timeStr(sh.free[1])}</b>` : ''}</p>` : ''}
+    ${calMsg}${timelineHtml(d, timed, b.timed)}${stale}
+    ${c && c.errors && c.errors.length ? `<div class="errbox">Some calendars could not be read: ${esc(c.errors.map(e => e.calendar).join(', '))}</div>` : ''}
+    </div>`;
+}
+
+/* ----- inbox ----- */
+const mailLink = m => `https://mail.google.com/mail/u/${encodeURIComponent((S.inbox && S.inbox.account) || '0')}/#inbox/${m.threadId}`;
+function inboxHtml() {
+  const I = S.inbox, st = S.status.mail, now = Date.now();
+  const f = { all: () => true, crm: m => !!m.crm, starred: m => m.starred, recent: m => now - m.at < 2 * 864e5 }[mailFilter];
+  const list = I ? I.messages.filter(f) : [];
+  const chips = [['all', 'All'], ['crm', 'From CRM'], ['starred', 'Starred'], ['recent', 'Last 2 days']];
+  return `<div class="hd"><div><h1>Inbox</h1><div class="mu">${I ? `${I.unread} unread${I.messages.length < I.unread ? ` · showing the latest ${I.messages.length}` : ''}` : ''}</div></div>${pill()}</div>
+    <div class="chips" style="margin-bottom:6px">${chips.map(([k, l]) => `<button class="chip ${mailFilter === k ? 'on' : ''}" data-mf="${k}">${l}</button>`).join('')}</div>
+    ${!I ? `<p class="empty">${connected() ? (st && !st.ok ? '' : 'Loading your inbox…') : 'Connect Google in Settings to see your unread mail.'}</p>` : ''}
+    ${st && !st.ok ? `<div class="errbox">${esc(st.message)}${I ? '<br>Showing the copy from ' + new Date(I.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.' : ''}</div>` : ''}
+    ${I && !list.length ? '<p class="empty">Nothing here. Inbox zero for this filter.</p>' : ''}
+    ${list.map(m => `<div class="mail"><a class="mb" href="${esc(mailLink(m))}" target="_blank" rel="noopener">
+      <div class="l1"><b>${esc(m.from.name)}${m.crm ? `<span class="badge day" style="color:var(--ink)">CRM${m.crm.tier ? ' ' + esc(m.crm.tier.split(' ')[0]) : ''}</span>` : ''}${m.starred ? ' ★' : ''}</b><span>${mailTime(m.at)}</span></div>
+      <div class="l2">${esc(m.subject)}</div><div class="l3">${esc(m.snippet)}</div></a>
+      <button class="mt" data-mtask="${esc(m.id)}" aria-label="Make a task from this mail">+ Task</button></div>`).join('')}
+    <p class="muted" style="font-size:12px;margin:12px 2px 0">Tapping a mail opens it in Gmail. My Day only reads your mail.</p>`;
+}
+
+/* ----- more / history ----- */
+function moreHtml() {
+  return `<div class="hd"><h1>More</h1>${pill()}</div>
+    <button class="menu" data-act="new-note-now"><i>＋</i><span>New meeting note<small>Creates it in your Notion Meetings database and opens it</small></span></button>
+    <a class="menu" href="${MEETINGS_DB_URL}" target="_blank" rel="noopener"><i>▤</i><span>Meetings database<small>Open in Notion</small></span></a>
+    <a class="menu" href="${TASKS_DB_URL}" target="_blank" rel="noopener"><i>☑</i><span>Task database<small>Open in Notion</small></span></a>
+    <button class="menu" data-act="to-history"><i>↗</i><span>History<small>Mood over time and patterns</small></span></button>
+    <button class="menu" data-act="to-settings"><i>⚙</i><span>Settings<small>Connection, theme, backup</small></span></button>`;
+}
+function insightHtml(days) {
+  const rows = days.map(d => ({ d, r: S.reviews[d], h: S.health[d] })).filter(x => x.r && x.r.mood);
+  const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+  const cmp = (label, yes, no, yl, nl) => (yes.length >= 4 && no.length >= 4)
+    ? `<span class="k">${label}</span><b>${avg(yes.map(x => x.r.mood)).toFixed(1)} vs ${avg(no.map(x => x.r.mood)).toFixed(1)}</b><span class="k" style="grid-column:1/-1;font-size:12px;margin-top:-4px">average mood: ${yl} (${yes.length} days) vs ${nl} (${no.length} days)</span>` : '';
+  const withSleep = rows.filter(x => x.h && x.h.sleepMinutes != null);
+  const lines = [
+    cmp('Sleep 7h or more', withSleep.filter(x => x.h.sleepMinutes >= 420), withSleep.filter(x => x.h.sleepMinutes < 420), '7h+ of sleep', 'less sleep'),
+    cmp('Days with sport', rows.filter(x => (x.r.tags || []).includes('Sport')), rows.filter(x => !(x.r.tags || []).includes('Sport')), 'sport', 'no sport'),
+    cmp('Days with 8,000+ steps', rows.filter(x => x.h && x.h.steps >= 8000), rows.filter(x => x.h && x.h.steps != null && x.h.steps < 8000), '8,000+ steps', 'fewer steps'),
+  ].filter(Boolean);
+  return `<div class="card"><h3>Patterns</h3>${lines.length ? `<div class="kv num">${lines.join('')}</div>` : `<p class="empty">Patterns show up once you have at least four logged days on each side of a comparison (sleep, sport, steps). You have ${rows.length} mood entries in this period.</p>`}
+    <p class="muted" style="font-size:12px;margin:10px 0 0">These are averages of your own entries, not proof that one thing causes the other.</p></div>`;
+}
+function moodChart(days) {
+  const W = 340, H = 110, padL = 22, padB = 16, padT = 8, pw = W - padL - 6, ph = H - padB - padT;
+  const x = i => padL + (days.length === 1 ? pw / 2 : (i / (days.length - 1)) * pw), y = v => padT + ph - ((v - 1) / 4) * ph;
+  let svg = [1, 3, 5].map(v => `<line x1="${padL}" x2="${W - 6}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${padL - 6}" y="${y(v) + 3}" text-anchor="end">${v}</text>`).join('');
+  let seg = [], path = '';
+  const flush = () => { if (seg.length > 1) path += `<polyline points="${seg.join(' ')}" fill="none" stroke="var(--ink)" stroke-width="2"/>`; seg = []; };
+  days.forEach((d, i) => { const m = (S.reviews[d] || {}).mood; if (m) seg.push(`${x(i).toFixed(1)},${y(m).toFixed(1)}`); else flush(); });
+  flush();
+  const dots = days.map((d, i) => { const m = (S.reviews[d] || {}).mood; return m ? `<circle cx="${x(i).toFixed(1)}" cy="${y(m).toFixed(1)}" r="3" fill="var(--ink)"/>` : ''; }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Mood over time">${svg}${path}${dots}</svg>`;
+}
+function historyHtml() {
+  const t = today(), days = [];
+  for (let i = histDays - 1; i >= 0; i--) days.push(addDays(t, -i));
+  const logged = days.filter(d => S.reviews[d]);
+  const list = [...logged].reverse().map(d => {
+    const r = S.reviews[d], h = S.health[d] || {};
+    const sub = [(r.tags || []).join(', '), r.energy ? `energy ${r.energy}/5` : '', h.sleepMinutes != null ? `slept ${dur(h.sleepMinutes)}` : '', h.steps != null ? `${fmt(h.steps)} steps` : ''].filter(Boolean).join(' · ');
+    const text = (r.win || r.did || '').split('\n')[0];
+    return `<button class="hrow" data-rev="${d}"><span class="em">${r.mood ? MOODS[r.mood - 1][0] : '•'}</span><span><span class="hd2">${shortDate(d)}</span><span class="sub">${esc(sub)}</span>${text ? `<span class="sub" style="color:var(--ink)">${esc(text.slice(0, 120))}</span>` : ''}</span></button>`;
+  }).join('');
+  return `<button class="back" data-act="to-more">‹ More</button><div class="hd"><h1>History</h1>${pill()}</div><div class="stack">
+    <div class="seg">${[14, 30, 90].map(n => `<button data-hist="${n}" class="${histDays === n ? 'on' : ''}">${n} days</button>`).join('')}</div>
+    <div class="card"><h3>Mood</h3>${moodChart(days)}<p class="muted" style="font-size:12px;margin:6px 0 0">${logged.length} of ${histDays} days logged. Gaps are days with no entry.</p></div>
+    ${insightHtml(days)}
+    <div class="card"><h3>Your days</h3>${list || '<p class="empty">Nothing logged yet. Try the Review tab tomorrow morning.</p>'}</div></div>`;
 }
 
 /* ----- review ----- */
+function dateBar(date, prevAct, nextAct) {
+  return `<div class="hd"><div style="display:flex;align-items:center;gap:6px">
+    <button class="pill" data-act="${prevAct}" aria-label="Previous day">‹</button>
+    <div><h1 style="font-size:19px">${dayLabel(date)}</h1><div class="mu">${longDate(date)}</div></div>
+    <button class="pill" data-act="${nextAct}" aria-label="Next day">›</button></div>${pill()}</div>`;
+}
 function factsHtml(date) {
   const c = S.cache[date], done = (S.tasks && S.tasks.doneOn[date]) || [], h = S.health[date] || {};
   const timed = c ? c.events.filter(e => !e.allDay) : [];
@@ -398,25 +545,25 @@ function factsHtml(date) {
     ${timed.length ? `<div class="muted" style="font-size:13px">Meetings</div><ul>${timed.map(e => `<li>${timeStr(e.start)} ${esc(e.title)}</li>`).join('')}</ul>` : ''}
     ${done.length ? `<div class="muted" style="font-size:13px">Tasks completed</div><ul>${done.map(t => `<li>${esc(t.title)}</li>`).join('')}</ul>` : ''}
     ${hb.length ? `<div class="muted" style="font-size:13px">Health</div><p style="margin:4px 0;font-size:14px">${hb.join(' · ')}</p>` : ''}
-    ${timed.length || done.length ? `<button class="btn ghost" style="margin-top:8px" data-act="fill-notes">Add meetings and tasks to my notes</button>` : ''}</div>`;
+    ${timed.length || done.length ? `<button class="btn" style="margin-top:8px" data-act="fill-notes">Add meetings and tasks to my notes</button>` : ''}</div>`;
 }
 function reviewHtml() {
   const r = S.reviews[reviewDate] || {}, tags = [...BASE_TAGS, ...S.tags];
   return `${dateBar(reviewDate, 'rprev', 'rnext')}<div class="stack">
     <div class="card"><h3>How was the day?</h3>
-      <div class="moods" id="moods">${MOODS.map(([e, l], i) => `<button data-mood="${i + 1}" class="${r.mood === i + 1 ? 'on' : ''}" aria-label="${l}">${e}<small>${l}</small></button>`).join('')}</div>
+      <div class="moods">${MOODS.map(([e, l], i) => `<button data-mood="${i + 1}" class="${r.mood === i + 1 ? 'on' : ''}" aria-label="${l}">${e}<small>${l}</small></button>`).join('')}</div>
       <span class="lbl2">Energy</span>
-      <div class="scale" id="energy">${[1, 2, 3, 4, 5].map(n => `<button data-energy="${n}" class="${r.energy === n ? 'on' : ''}">${n}</button>`).join('')}</div>
+      <div class="scale">${[1, 2, 3, 4, 5].map(n => `<button data-energy="${n}" class="${r.energy === n ? 'on' : ''}">${n}</button>`).join('')}</div>
       <div class="scalehint"><span>drained</span><span>full of energy</span></div>
       <span class="lbl2">What was it about?</span>
-      <div class="chips" id="tags">${tags.map(t => `<button class="chip ${(r.tags || []).includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}<button class="chip" data-act="new-tag">+ tag</button></div>
+      <div class="chips">${tags.map(t => `<button class="chip ${(r.tags || []).includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}<button class="chip" data-act="new-tag">+ tag</button></div>
       <span class="lbl2">What happened</span>
-      <textarea class="field" id="did" placeholder="Meetings, workout, who you saw, anything worth remembering">${esc(r.did || '')}</textarea>
+      <textarea class="field" id="did" style="margin-top:0" placeholder="Meetings, workout, who you saw, anything worth remembering">${esc(r.did || '')}</textarea>
       <span class="lbl2">Best moment or one win</span>
-      <input class="field" id="win" value="${esc(r.win || '')}" placeholder="Optional">
+      <input class="field" id="win" style="margin-top:0" value="${esc(r.win || '')}" placeholder="Optional">
       <div class="saved" id="saved">${r.updatedAt ? 'Saved ✓' : ''}</div></div>
     ${factsHtml(reviewDate)}
-    ${r.updatedAt ? `<button class="btn ghost" data-act="clear-review">Clear this day's review</button>` : ''}</div>`;
+    ${r.updatedAt ? `<button class="btn" data-act="clear-review">Clear this day's review</button>` : ''}</div>`;
 }
 let saveTimer;
 function patchReview(patch) {
@@ -438,78 +585,38 @@ function bindReview(root) {
   typed('did', 'did'); typed('win', 'win');
 }
 
-/* ----- history ----- */
-function insightHtml(days) {
-  const rows = days.map(d => ({ d, r: S.reviews[d], h: S.health[d] })).filter(x => x.r && x.r.mood);
-  const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
-  const cmp = (label, yes, no, yl, nl) => (yes.length >= 4 && no.length >= 4)
-    ? `<span class="k">${label}</span><b>${avg(yes.map(x => x.r.mood)).toFixed(1)} vs ${avg(no.map(x => x.r.mood)).toFixed(1)}</b><span class="k" style="grid-column:1/-1;font-size:12px;margin-top:-4px">average mood: ${yl} (${yes.length} days) vs ${nl} (${no.length} days)</span>` : '';
-  const withSleep = rows.filter(x => x.h && x.h.sleepMinutes != null);
-  const lines = [
-    cmp('Sleep 7h or more', withSleep.filter(x => x.h.sleepMinutes >= 420), withSleep.filter(x => x.h.sleepMinutes < 420), '7h+ of sleep', 'less sleep'),
-    cmp('Days with sport', rows.filter(x => (x.r.tags || []).includes('Sport')), rows.filter(x => !(x.r.tags || []).includes('Sport')), 'sport', 'no sport'),
-    cmp('Days with 8,000+ steps', rows.filter(x => x.h && x.h.steps >= 8000), rows.filter(x => x.h && x.h.steps != null && x.h.steps < 8000), '8,000+ steps', 'fewer steps'),
-  ].filter(Boolean);
-  return `<div class="card"><h3>Patterns</h3>${lines.length ? `<div class="kv num">${lines.join('')}</div>` : `<p class="empty">Patterns show up once you have at least four logged days on each side of a comparison (sleep, sport, steps). You have ${rows.length} mood entries in this period.</p>`}
-    <p class="muted" style="font-size:12px;margin:10px 0 0">These are averages of your own entries, not proof that one thing causes the other.</p></div>`;
-}
-function moodChart(days) {
-  const W = 340, H = 110, padL = 22, padB = 16, padT = 8, pw = W - padL - 6, ph = H - padB - padT;
-  const x = i => padL + (days.length === 1 ? pw / 2 : (i / (days.length - 1)) * pw), y = v => padT + ph - ((v - 1) / 4) * ph;
-  let svg = [1, 3, 5].map(v => `<line x1="${padL}" x2="${W - 6}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${padL - 6}" y="${y(v) + 3}" text-anchor="end">${v}</text>`).join('');
-  let seg = [], path = '';
-  days.forEach((d, i) => { const m = (S.reviews[d] || {}).mood; if (m) seg.push(`${x(i).toFixed(1)},${y(m).toFixed(1)}`); else { if (seg.length > 1) path += `<polyline points="${seg.join(' ')}" fill="none" stroke="var(--day)" stroke-width="2"/>`; seg = []; } });
-  if (seg.length > 1) path += `<polyline points="${seg.join(' ')}" fill="none" stroke="var(--day)" stroke-width="2"/>`;
-  const dots = days.map((d, i) => { const m = (S.reviews[d] || {}).mood; return m ? `<circle cx="${x(i).toFixed(1)}" cy="${y(m).toFixed(1)}" r="3" fill="var(--day)"/>` : ''; }).join('');
-  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Mood over time">${svg}${path}${dots}</svg>`;
-}
-function historyHtml() {
-  const t = today(), days = [];
-  for (let i = histDays - 1; i >= 0; i--) days.push(addDays(t, -i));
-  const logged = days.filter(d => S.reviews[d]);
-  const list = [...logged].reverse().map(d => {
-    const r = S.reviews[d], h = S.health[d] || {};
-    const sub = [(r.tags || []).join(', '), r.energy ? `energy ${r.energy}/5` : '', h.sleepMinutes != null ? `slept ${dur(h.sleepMinutes)}` : '', h.steps != null ? `${fmt(h.steps)} steps` : ''].filter(Boolean).join(' · ');
-    const text = (r.win || r.did || '').split('\n')[0];
-    return `<button class="hrow" data-rev="${d}"><span class="em">${r.mood ? MOODS[r.mood - 1][0] : '•'}</span><span><span class="hd">${shortDate(d)}</span><span class="sub" style="display:block">${esc(sub)}</span>${text ? `<span class="sub" style="display:block;color:var(--ink)">${esc(text.slice(0, 120))}</span>` : ''}</span></button>`;
-  }).join('');
-  return `<div class="topbar"><h2 style="margin:0;font-size:20px">History</h2>${pill()}</div><div class="stack">
-    <div class="seg">${[14, 30, 90].map(n => `<button data-hist="${n}" class="${histDays === n ? 'on' : ''}">${n} days</button>`).join('')}</div>
-    <div class="card"><h3>Mood</h3>${moodChart(days)}<p class="muted" style="font-size:12px;margin:6px 0 0">${logged.length} of ${histDays} days logged. Gaps are days with no entry.</p></div>
-    ${insightHtml(days)}
-    <div class="card"><h3>Your days</h3>${list || '<p class="empty">Nothing logged yet. Try the Review tab tomorrow morning.</p>'}</div></div>`;
-}
-
 /* ----- settings ----- */
 function settingsHtml() {
   const st = S.status, fmtAt = a => new Date(a).toLocaleString();
   const row = (label, s) => s ? `<div class="${s.ok ? 'okbox' : 'errbox'}"><b>${label}</b> ${fmtAt(s.at)}: ${s.ok ? 'OK' : ''}${s.message ? '<br>' + esc(s.message).replace(/\n/g, '<br>') : ''}</div>` : '';
-  return `<div class="topbar"><h2 style="margin:0;font-size:20px">Settings</h2></div><div class="stack set">
+  return `<button class="back" data-act="to-more">‹ More</button><div class="hd"><h1>Settings</h1></div><div class="stack set">
     <div class="card"><h3>Connection</h3>
-      <p class="muted">Uses the same Worker as Calorie tracker. Calendar and tasks come through it. Sleep and heart-rate figures use the Google Health connection you made in Calorie tracker.</p>
+      <p class="muted">Uses the same Worker as Calorie tracker. Calendar, Gmail and tasks come through it. Sleep and heart-rate figures use the Google Health connection you made in Calorie tracker.</p>
       <label class="lbl2" for="baseUrl">Worker address</label>
-      <input class="field" id="baseUrl" inputmode="url" autocapitalize="off" value="${esc(S.settings.baseUrl)}" placeholder="https://calorie-tracker.yourname.workers.dev">
+      <input class="field" style="margin-top:0" id="baseUrl" inputmode="url" autocapitalize="off" value="${esc(S.settings.baseUrl)}" placeholder="https://calorie-tracker.yourname.workers.dev">
       <label class="lbl2" for="appKey">App key</label>
-      <input class="field" id="appKey" type="password" autocomplete="off" value="${esc(S.settings.appKey)}" placeholder="paste your app key">
+      <input class="field" style="margin-top:0" id="appKey" type="password" autocomplete="off" value="${esc(S.settings.appKey)}" placeholder="paste your app key">
       <div class="row" style="margin-top:12px;flex-wrap:wrap">
         <button class="btn day" data-act="save-conn">Save</button>
-        <button class="btn ghost" data-act="connect">Connect Google Calendar</button>
-        <button class="btn ghost" data-act="check">Check connection</button>
-        <button class="btn ghost" data-act="sync-all">Refresh everything</button>
+        <button class="btn" data-act="connect">Connect Google (Calendar and Gmail)</button>
+        <button class="btn" data-act="check">Check connection</button>
+        <button class="btn" data-act="sync-all">Refresh everything</button>
       </div>
       <div id="checkOut"></div>
-      ${row('Calendar', st.cal)}${row('Tasks', st.tasks)}${row('Health', st.health)}</div>
+      ${row('Calendar', st.cal)}${row('Tasks', st.tasks)}${row('Mail', st.mail)}${row('Health', st.health)}</div>
+    <div class="card"><h3>Theme</h3>
+      <div class="seg">${[['dark', 'Dark'], ['light', 'Light'], ['auto', 'Match phone']].map(([k, l]) => `<button data-theme-set="${k}" class="${S.settings.theme === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
     <div class="card"><h3>Your tags</h3>
-      <p class="muted">Quick tags in the Review. Add your own from the Review tab.</p>
-      <div class="chips">${[...BASE_TAGS].map(t => `<span class="chip">${esc(t)}</span>`).join('')}${S.tags.map(t => `<button class="chip on" data-tagdel="${esc(t)}">${esc(t)} ✕</button>`).join('')}</div></div>
+      <p class="muted">Quick tags in the Review. Add your own from the Review tab; tap one of yours here to remove it.</p>
+      <div class="chips">${BASE_TAGS.map(t => `<span class="chip">${esc(t)}</span>`).join('')}${S.tags.map(t => `<button class="chip on" data-tagdel="${esc(t)}">${esc(t)} ✕</button>`).join('')}</div></div>
     <div class="card"><h3>Your data</h3>
       <p class="muted">Reviews and prep notes live on this device only. Export a backup now and then.</p>
-      <div class="row" style="flex-wrap:wrap"><button class="btn ghost" data-act="export">Export backup</button><button class="btn ghost" data-act="import">Import backup</button>
-      ${S.demo ? `<button class="btn ghost" data-act="demo-off">Remove demo data</button>` : `<button class="btn ghost" data-act="demo-on">Load demo data</button>`}</div>
+      <div class="row" style="flex-wrap:wrap"><button class="btn" data-act="export">Export backup</button><button class="btn" data-act="import">Import backup</button>
+      ${S.demo ? `<button class="btn" data-act="demo-off">Remove demo data</button>` : `<button class="btn" data-act="demo-on">Load demo data</button>`}</div>
       <input type="file" id="importFile" accept="application/json" hidden></div>
     <div class="card"><h3>About</h3>
       <p class="muted">Build <b>${BUILD}</b> · <a href="privacy.html">Privacy policy</a></p>
-      <button class="btn ghost" data-act="force">Force refresh app</button>
+      <button class="btn" data-act="force">Force refresh app</button>
       <p class="muted" style="font-size:12px">Clears cached files and reloads. Your reviews are not touched.</p></div></div>`;
 }
 
@@ -524,32 +631,34 @@ function findEvent(key) {
   return null;
 }
 const RESP = { accepted: '✓', declined: '✗', tentative: '?', needsAction: '·' };
+const crmCache = {}, crmPending = {}, mailCache = {};
+
 function openEvent(key) {
   const e = findEvent(key); if (!e) return;
   const mins = (Date.parse(e.end) - Date.parse(e.start)) / 6e4, people = e.attendees.filter(a => !a.self);
   openSheet(`<h2>${esc(e.title)}</h2>
     <p class="muted" style="margin:2px 0 10px">${e.allDay ? 'All day' : `${shortDate(ymd(new Date(e.start)))} · ${timeStr(e.start)} to ${timeStr(e.end)} (${dur(mins)})`}${e.calendar ? ' · ' + esc(e.calendar) : ''}</p>
-    <div class="row" style="flex-wrap:wrap">${e.video ? `<a class="btn day" href="${esc(e.video)}" target="_blank" rel="noopener">Join call</a>` : ''}${e.link ? `<a class="btn ghost" href="${esc(e.link)}" target="_blank" rel="noopener">Open in Calendar</a>` : ''}</div>
+    <div class="row" style="flex-wrap:wrap">${e.video ? `<a class="btn day" href="${esc(e.video)}" target="_blank" rel="noopener">Join call</a>` : ''}<button class="btn" id="mnBtn">New meeting note</button>${e.link ? `<a class="btn" href="${esc(e.link)}" target="_blank" rel="noopener">Open in Calendar</a>` : ''}</div>
     ${e.location ? `<span class="lbl2">Where</span><div>${linkify(e.location)}</div>` : ''}
     ${e.organizer ? `<span class="lbl2">Organiser</span><div>${esc(e.organizer)}</div>` : ''}
     ${people.length ? `<span class="lbl2">Who (${e.attendeeCount})</span>${people.map(a => `<div class="people"><span class="r">${RESP[a.response] || '·'}</span>${esc(a.name)}${a.organizer ? ' · organiser' : ''}${a.optional ? ' · optional' : ''}</div>`).join('')}${e.attendeeCount > e.attendees.length ? `<div class="muted" style="font-size:12px">and ${e.attendeeCount - e.attendees.length} more</div>` : ''}<div class="muted" style="font-size:12px">✓ yes · ? maybe · ✗ no · · no reply</div>` : ''}
     ${e.description ? `<span class="lbl2">Description</span><div class="desc">${linkify(e.description)}</div>` : ''}
-    <div id="crm"></div>
+    <div id="crm"></div><div id="mails"></div>
     <span class="lbl2">Your prep notes (kept on this phone)</span>
-    <textarea class="field" id="prep" placeholder="What do you want out of this? Questions to ask, numbers to have ready.">${esc(S.prep[key] || '')}</textarea>
+    <textarea class="field" style="margin-top:0" id="prep" placeholder="What do you want out of this? Questions to ask, numbers to have ready.">${esc(S.prep[key] || '')}</textarea>
     <div class="row" style="margin-top:14px"><button class="btn day" id="prepDone">Done</button></div>`);
   const store = () => { const v = $('prep').value.trim(); if (v) S.prep[key] = v; else delete S.prep[key]; save(); };
   $('prep').onblur = store;
   $('prepDone').onclick = () => { store(); closeSheet(); };
-  loadBrief(e, key);
+  $('mnBtn').onclick = async () => {
+    let ids = [];
+    try { const r = crmCache[key] || await crmPending[key]; ids = (r ? r.people : []).map(p => p.id); } catch { /* note is still created, just without attendees */ }
+    startMeetingNote({ title: e.title, start: e.start, end: e.end, attendees: ids });
+  };
+  loadBrief(e, key); loadThreads(e, key);
 }
 
 /* ---- CRM context for the people in a meeting (Notion People database, read only) ---- */
-const crmCache = {};
-function ago(d) {
-  const n = Math.round((Date.now() - Date.parse(d)) / 864e5);
-  return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n < 14 ? `${n} days ago` : n < 60 ? `${Math.round(n / 7)} weeks ago` : `${Math.round(n / 30)} months ago`;
-}
 function crmHtml(r, e) {
   const people = r.people.map(p => {
     const last = p.lastContacted || p.latestInteraction || p.latestMeeting;
@@ -567,39 +676,55 @@ function crmHtml(r, e) {
   return `<span class="lbl2">From your CRM</span>${people || '<p class="muted" style="margin:0">Nobody in this meeting is in your CRM yet.</p>'}
     ${names.length && people ? `<p class="muted" style="font-size:12px;margin:8px 0 0">Not in your CRM: ${esc(names.join(', '))}</p>` : ''}`;
 }
-async function loadBrief(e, key) {
+function loadBrief(e, key) {
   const emails = e.attendees.filter(a => !a.self && a.email).map(a => a.email);
   if (!emails.length || (!connected() && !S.demo)) return;
   $('crm').innerHTML = '<span class="lbl2">From your CRM</span><p class="muted" style="margin:0">Looking up the attendees…</p>';
-  try {
-    const r = crmCache[key] || (crmCache[key] = S.demo ? demoBrief(emails) : await api('/api/brief', { method: 'POST', body: JSON.stringify({ emails }) }));
+  crmPending[key] = crmCache[key] ? Promise.resolve(crmCache[key]) : (S.demo ? Promise.resolve(demoBrief(emails)) : post('/api/brief', { emails }));
+  crmPending[key].then(r => {
+    crmCache[key] = r;
     const box = $('crm'); if (!box) return;
     box.innerHTML = crmHtml(r, e);
-    box.querySelectorAll('[data-addfor]').forEach(b => b.onclick = () => openAddTask({ id: b.dataset.addfor, name: b.dataset.name }));
-  } catch (err) {
-    delete crmCache[key];
-    const box = $('crm'); if (box) box.innerHTML = `<span class="lbl2">From your CRM</span><div class="errbox">${esc(err.message)}</div>`;
-  }
+    box.querySelectorAll('[data-addfor]').forEach(b => b.onclick = () => openAddTask({ person: { id: b.dataset.addfor, name: b.dataset.name } }));
+  }).catch(err => { delete crmCache[key]; const box = $('crm'); if (box) box.innerHTML = `<span class="lbl2">From your CRM</span><div class="errbox">${esc(err.message)}</div>`; });
+}
+function loadThreads(e, key) {
+  const emails = e.attendees.filter(a => !a.self && a.email).map(a => a.email);
+  if (!emails.length || (!connected() && !S.demo)) return;
+  const p = mailCache[key] ? Promise.resolve(mailCache[key]) : (S.demo ? Promise.resolve(demoThreads()) : post('/api/mail/threads', { emails }));
+  p.then(r => {
+    mailCache[key] = r;
+    const box = $('mails'); if (!box || !r.messages.length) return;
+    const acct = encodeURIComponent(r.account || '0');
+    box.innerHTML = `<span class="lbl2">Recent email with them</span><div class="card" style="padding:6px 14px">${r.messages.map(m => `<a class="thread" href="https://mail.google.com/mail/u/${acct}/#all/${m.threadId}" target="_blank" rel="noopener"><b style="font-weight:600">${esc(m.subject)}</b><div class="muted" style="font-size:12px">${m.mine ? 'You' : esc(m.from.name)} · ${mailTime(m.at)}</div></a>`).join('')}</div>`;
+  }).catch(err => { const box = $('mails'); if (box) box.innerHTML = `<span class="lbl2">Recent email with them</span><div class="errbox">${esc(err.message)}</div>`; });
 }
 function demoBrief(emails) {
   return { unmatched: emails.slice(1), people: [{ id: 'demo-p1', url: '#', name: 'Dana Fox', email: emails[0], role: 'CFO', company: 'Acme Corp', tier: 'A - Key', summary: 'Met at the Vienna summit in June. Interested in a pilot for Q1; asked for pricing and two references. Last call went well.', how: 'Met at a conference', lastContacted: addDays(today(), -26), followStatus: 'Overdue', nextFollowUp: null, latestInteraction: null, latestMeeting: null,
     tasks: [{ id: 'demo-1', title: 'Send proposal to Acme', due: addDays(today(), -1), status: 'Not started', waiting: false }, { id: 'demo-w', title: 'Dana to confirm budget', due: null, status: 'Not started', waiting: true }] }] };
 }
+function demoThreads() {
+  const now = Date.now();
+  return { account: 'me@example.com', messages: [{ threadId: 'x1', subject: 'Re: pilot terms', from: { name: 'Dana Fox' }, mine: false, at: now - 2 * 864e5 }, { threadId: 'x2', subject: 'Pricing and references', from: { name: 'Me' }, mine: true, at: now - 9 * 864e5 }] };
+}
+
 function openTask(id) {
   const t = findTask(id); if (!t) return;
   openSheet(`<h2>${esc(t.title)}</h2>
-    <p class="muted" style="margin:2px 0 10px">${[t.status, dueDay(t) ? 'due ' + shortDate(dueDay(t)) : 'no due date', t.types.join(', ')].filter(Boolean).join(' · ')}</p>
+    <p class="muted" style="margin:2px 0 10px">${[t.status, dueDay(t) ? 'due ' + shortDate(dueDay(t)) + (hasTime(t) ? ' ' + hm(minutesIn(dueDay(t), t.due)) : '') : 'no due date', t.types.join(', ')].filter(Boolean).join(' · ')}</p>
     ${t.next ? `<span class="lbl2">Next step</span><div>${linkify(t.next)}</div>` : ''}
     <div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn day" id="tDone">${t.status === 'Done' ? 'Mark not done' : 'Mark done'}</button>
-      <a class="btn ghost" href="${esc(t.url)}" target="_blank" rel="noopener">Open in Notion</a><button class="btn ghost" id="tClose">Close</button></div>`);
+      <button class="btn" id="tBlock">Block time</button><a class="btn" href="${esc(t.url)}" target="_blank" rel="noopener">Open in Notion</a><button class="btn" id="tClose">Close</button></div>`);
   $('tDone').onclick = () => { closeSheet(); toggleTask(id); };
+  $('tBlock').onclick = () => { closeSheet(); openEventForm({ title: t.title, description: `Task: ${t.url}`, date: dueDay(t) && dueDay(t) >= today() ? dueDay(t) : (viewDate >= today() ? viewDate : today()) }); };
   $('tClose').onclick = closeSheet;
 }
 function findTask(id) {
   if (!S.tasks) return null;
   return S.tasks.open.find(t => t.id === id) || Object.values(S.tasks.doneOn).flat().find(t => t.id === id) || null;
 }
-function openAddTask(person) {
+function openAddTask(o = {}) {
+  const person = o.person;
   let due = viewDate >= today() ? viewDate : today(), type = '';
   const draw = () => {
     $('dueChips').innerHTML = [[today(), 'Today'], [addDays(today(), 1), 'Tomorrow'], ['', 'No date']].map(([d, l]) => `<button class="chip ${due === d ? 'on' : ''}" data-d="${d}">${l}</button>`).join('');
@@ -608,11 +733,11 @@ function openAddTask(person) {
     $('typeChips').querySelectorAll('button').forEach(b => b.onclick = () => { type = b.dataset.t; draw(); });
   };
   openSheet(`<h2>New task</h2><p class="muted" style="margin:2px 0 8px">Goes straight into your Notion task database${person ? `, linked to ${esc(person.name || 'this person')} in your CRM` : ''}.</p>
-    <input class="field" id="tTitle" placeholder="${person ? `e.g. Follow up with ${esc(person.name)}` : 'What needs doing?'}" maxlength="200" autofocus>
+    <input class="field" id="tTitle" placeholder="${person ? `e.g. Follow up with ${esc(person.name)}` : 'What needs doing?'}" maxlength="200" value="${esc(o.title || '')}" autofocus>
     <span class="lbl2">Due</span><div class="chips" id="dueChips"></div>
-    <input class="field" id="dueDate" type="date" style="margin-top:8px" value="${due}">
+    <input class="field" id="dueDate" type="date" value="${due}">
     <span class="lbl2">Type</span><div class="chips" id="typeChips"></div>
-    <div class="row" style="margin-top:16px"><button class="btn day" id="tSave">Add task</button><button class="btn ghost" id="tCancel">Cancel</button></div>`);
+    <div class="row" style="margin-top:16px"><button class="btn day" id="tSave">Add task</button><button class="btn" id="tCancel">Cancel</button></div>`);
   draw();
   $('dueDate').onchange = () => { due = $('dueDate').value; draw(); };
   $('tCancel').onclick = closeSheet;
@@ -620,11 +745,9 @@ function openAddTask(person) {
     const title = $('tTitle').value.trim(); if (!title) return $('tTitle').focus();
     $('tSave').disabled = true;
     try {
+      if (S.tasks === null) S.tasks = { at: Date.now(), open: [], doneOn: {} };
       if (S.demo) S.tasks.open.push({ id: 'demo-' + Date.now(), title, status: 'Not started', due: due || null, done: null, types: type ? [type] : [], tags: [], waiting: false, crm: !!person, people: [], next: '', url: '#' });
-      else {
-        const r = await api('/api/tasks/add', { method: 'POST', body: JSON.stringify({ title, due: due || undefined, type: type || undefined, person: person ? person.id : undefined }) });
-        S.tasks.open.push(r.task);
-      }
+      else { const r = await post('/api/tasks/add', { title, due: due || undefined, type: type || undefined, person: person ? person.id : undefined, notes: o.notes || undefined }); S.tasks.open.push(r.task); }
       save(); closeSheet(); render(); toast('Task added');
     } catch (e) { $('tSave').disabled = false; toast('Could not add: ' + e.message); }
   };
@@ -638,14 +761,83 @@ function toggleTask(id) {
     else { T.doneOn[today()] = doneList.filter(x => x.id !== id); if (!T.open.some(x => x.id === id)) T.open.push({ ...t, status: prevStatus, done: null }); }
     save(); render();
   };
-  const send = async nowDone => {
-    if (S.demo) return;
-    await api(nowDone ? '/api/tasks/done' : '/api/tasks/reopen', { method: 'POST', body: JSON.stringify(nowDone ? { id, date: today() } : { id, status: prevStatus }) });
-  };
+  const send = async nowDone => { if (S.demo) return; await post(nowDone ? '/api/tasks/done' : '/api/tasks/reopen', nowDone ? { id, date: today() } : { id, status: prevStatus }); };
   const nowDone = !wasDone;
   apply(nowDone);
   send(nowDone).then(() => toast(nowDone ? `Done · ${t.title}` : `Reopened · ${t.title}`, 'Undo', () => { apply(!nowDone); send(!nowDone).catch(e => toast('Undo failed in Notion: ' + e.message)); }))
     .catch(e => { apply(!nowDone); toast('Notion did not accept that: ' + e.message); });
+}
+
+/* ---- add an event to Google Calendar ---- */
+function openEventForm(o = {}) {
+  const base = o.date || (viewDate >= today() ? viewDate : today());
+  const nowM = new Date().getHours() * 60 + new Date().getMinutes();
+  let startMin = o.startMin != null ? o.startMin : (base === today() ? Math.ceil((nowM + 5) / 30) * 30 : 9 * 60);
+  startMin = Math.max(0, Math.min(startMin, 23 * 60 + 30));
+  const t = m => hm(Math.min(m, 1439));
+  openSheet(`<h2>New event</h2><p class="muted" style="margin:2px 0 4px">Added to your Google Calendar.</p>
+    <input class="field" id="evTitle" placeholder="Title" maxlength="200" value="${esc(o.title || '')}" autofocus>
+    <label class="ck2"><input type="checkbox" id="evAll"> All day</label>
+    <div class="row"><input class="field" type="date" id="evDate" value="${base}"><input class="field" type="date" id="evDate2" value="${base}" hidden></div>
+    <div class="row" id="evTimes"><input class="field" type="time" id="evStart" value="${t(startMin)}"><input class="field" type="time" id="evEnd" value="${t(startMin + 60)}"></div>
+    <input class="field" id="evWhere" placeholder="Where (optional)">
+    <input class="field" id="evGuests" placeholder="Guests: email addresses separated by commas (optional)" inputmode="email">
+    <div class="mu" id="evGuestNote" hidden style="margin:6px 2px 0">Guests get a calendar invitation when you save.</div>
+    <label class="ck2"><input type="checkbox" id="evMeet"> Add a Google Meet link</label>
+    <div class="row" style="margin-top:16px"><button class="btn day" id="evSave">Add to calendar</button><button class="btn" id="evCancel">Cancel</button></div>`);
+  const mins = v => { const [h, m] = (v || '0:0').split(':').map(Number); return h * 60 + m; };
+  let span = 60;
+  $('evStart').onchange = () => { $('evEnd').value = t(mins($('evStart').value) + span); };
+  $('evEnd').onchange = () => { span = Math.max(15, mins($('evEnd').value) - mins($('evStart').value)); };
+  $('evAll').onchange = () => { const a = $('evAll').checked; $('evTimes').hidden = a; $('evDate2').hidden = !a; };
+  $('evGuests').oninput = () => { $('evGuestNote').hidden = !$('evGuests').value.trim(); };
+  $('evCancel').onclick = closeSheet;
+  $('evSave').onclick = async () => {
+    const title = $('evTitle').value.trim(); if (!title) return $('evTitle').focus();
+    const all = $('evAll').checked, date = $('evDate').value; if (!date) return toast('Pick a date.');
+    const guests = $('evGuests').value.split(/[\s,;]+/).filter(Boolean);
+    if (guests.some(g => !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(g))) return toast('Check the guest email addresses.');
+    let body = { title, location: $('evWhere').value.trim() || undefined, description: o.description, guests, meet: $('evMeet').checked };
+    if (all) { const end = $('evDate2').value || date; if (end < date) return toast('The end date is before the start.'); body = { ...body, allDay: true, start: date, end: addDays(end, 1) }; }
+    else {
+      const s = new Date(`${date}T${$('evStart').value}`), e = new Date(`${date}T${$('evEnd').value}`);
+      if (isNaN(s) || isNaN(e) || e <= s) return toast('The end time must be after the start.');
+      body = { ...body, start: s.toISOString(), end: e.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+    }
+    $('evSave').disabled = true;
+    try {
+      if (S.demo) {
+        const c = S.cache[date] || (S.cache[date] = { at: Date.now(), events: [], calendars: [], errors: [] });
+        c.events.push({ id: 'demo-' + Date.now(), uid: 'demo-' + Date.now(), calendar: 'Demo', title, start: body.start, end: body.end, allDay: !!all, location: body.location || '', description: '', video: null, link: null, response: 'accepted', busy: true, organizer: '', attendees: [], attendeeCount: 0 });
+        c.events.sort((a, b) => (b.allDay - a.allDay) || (Date.parse(a.start) - Date.parse(b.start)));
+      } else await post('/api/calendar/add', body);
+      closeSheet(); toast(guests.length ? `Event added · invitations sent to ${guests.length}` : 'Event added');
+      viewDate = date; if (S.demo) { save(); render(); } else await loadDay(date);
+    } catch (err) { $('evSave').disabled = false; toast('Could not add the event: ' + err.message); }
+  };
+}
+function openFabMenu() {
+  openSheet(`<h2>Add</h2>
+    <button class="menu" id="fEv"><i>▦</i><span>New event<small>On your Google Calendar</small></span></button>
+    <button class="menu" id="fTask"><i>☑</i><span>New task<small>In your Notion task database</small></span></button>
+    <button class="menu" id="fNote"><i>✎</i><span>New meeting note<small>In your Notion Meetings database</small></span></button>
+    <a class="menu" href="${MEETINGS_DB_URL}" target="_blank" rel="noopener"><i>▤</i><span>Open Meetings database<small>In Notion</small></span></a>`);
+  $('fEv').onclick = () => { closeSheet(); openEventForm(); };
+  $('fTask').onclick = () => { closeSheet(); openAddTask(); };
+  $('fNote').onclick = () => { closeSheet(); startMeetingNote({ title: 'Meeting', start: new Date().toISOString() }); };
+}
+async function startMeetingNote(o) {
+  if (S.demo) return toast('Demo: this would create a note in your Notion Meetings database.');
+  if (!connected()) return toast('Connect in Settings first.');
+  toast('Creating the meeting note…');
+  try {
+    const r = await post('/api/meetings/new', { title: o.title || 'Meeting', start: o.start, end: o.end, attendees: o.attendees || [] });
+    toast('Meeting note created', 'Open in Notion', () => window.open(r.url, '_blank', 'noopener'));
+  } catch (e) { toast('Could not create the note: ' + e.message); }
+}
+function openMailTask(id) {
+  const m = S.inbox && S.inbox.messages.find(x => x.id === id); if (!m) return;
+  openAddTask({ title: `Reply: ${m.subject.replace(/^((re|fwd?|aw|wg):\s*)+/i, '')}`.slice(0, 200), notes: `Mail from ${m.from.name} <${m.from.email}>\n${mailLink(m)}`, person: m.crm ? { id: m.crm.id, name: m.crm.name.split(' ')[0] } : undefined });
 }
 
 /* ---------- events ---------- */
@@ -653,34 +845,51 @@ function bind(root) {
   root.querySelectorAll('[data-ev]').forEach(b => b.onclick = () => openEvent(b.dataset.ev));
   root.querySelectorAll('[data-done]').forEach(b => b.onclick = () => toggleTask(b.dataset.done));
   root.querySelectorAll('[data-task]').forEach(b => b.onclick = () => openTask(b.dataset.task));
+  root.querySelectorAll('[data-day]').forEach(b => b.onclick = () => { viewDate = b.dataset.day; render(); loadDay(viewDate); });
+  root.querySelectorAll('[data-mf]').forEach(b => b.onclick = () => { mailFilter = b.dataset.mf; render(); });
+  root.querySelectorAll('[data-mtask]').forEach(b => b.onclick = () => openMailTask(b.dataset.mtask));
   root.querySelectorAll('[data-rev]').forEach(b => b.onclick = () => { reviewDate = b.dataset.rev; view = 'review'; render(); window.scrollTo(0, 0); loadDay(reviewDate); });
   root.querySelectorAll('[data-hist]').forEach(b => b.onclick = () => { histDays = +b.dataset.hist; render(); });
   root.querySelectorAll('[data-tagdel]').forEach(b => b.onclick = () => { S.tags = S.tags.filter(t => t !== b.dataset.tagdel); save(); render(); });
+  root.querySelectorAll('[data-theme-set]').forEach(b => b.onclick = () => { S.settings.theme = b.dataset.themeSet; save(); applyTheme(); render(); });
   root.querySelectorAll('[data-act]').forEach(b => b.onclick = () => act(b.dataset.act));
   if (view === 'review') bindReview(root);
   if (view === 'settings') { const f = $('importFile'); if (f) f.onchange = importData; }
+  const tray = root.querySelector('#tray');
+  if (tray) tray.ontoggle = () => { S.settings.trayOpen = tray.open; save(); };
+  root.querySelectorAll('.tray .mini').forEach(b => b.addEventListener('click', e => e.preventDefault()));
+  const tl = root.querySelector('.tl');
+  if (tl) tl.onclick = ev => { // tap an empty slot to add an event there
+    if (ev.target.closest('.tev, .ttk')) return;
+    const r = tl.getBoundingClientRect(), min = Math.round(((ev.clientY - r.top) / HH * 60 + +tl.dataset.start * 60) / 15) * 15;
+    openEventForm({ date: viewDate, startMin: min });
+  };
 }
 async function act(a) {
-  if (a === 'prev') { viewDate = addDays(viewDate, -1); render(); loadDay(viewDate); }
-  else if (a === 'next') { viewDate = addDays(viewDate, 1); render(); loadDay(viewDate); }
+  if (a === 'wprev') { viewDate = addDays(viewDate, -7); render(); loadDay(viewDate); }
+  else if (a === 'wnext') { viewDate = addDays(viewDate, 7); render(); loadDay(viewDate); }
+  else if (a === 'today') { viewDate = today(); didScroll = false; render(); loadDay(viewDate); }
   else if (a === 'rprev') { reviewDate = addDays(reviewDate, -1); render(); loadDay(reviewDate); }
   else if (a === 'rnext') { reviewDate = addDays(reviewDate, 1); render(); loadDay(reviewDate); }
-  else if (a === 'refresh') loadDay(viewDate);
-  else if (a === 'goto-settings') { view = 'settings'; render(); window.scrollTo(0, 0); }
+  else if (a === 'refresh') { loadDay(viewDate); loadInbox(); }
+  else if (a === 'goto-settings' || a === 'to-settings') { view = 'settings'; render(); window.scrollTo(0, 0); }
+  else if (a === 'to-more') { view = 'more'; render(); window.scrollTo(0, 0); }
+  else if (a === 'to-history') { view = 'history'; render(); window.scrollTo(0, 0); }
   else if (a === 'review-yesterday') { reviewDate = addDays(today(), -1); go('review'); }
   else if (a === 'add-task') openAddTask();
+  else if (a === 'fab') openFabMenu();
+  else if (a === 'new-note-now') startMeetingNote({ title: 'Meeting', start: new Date().toISOString() });
   else if (a === 'new-tag') {
     const t = (prompt('New tag name') || '').trim().slice(0, 20);
     if (t && ![...BASE_TAGS, ...S.tags].some(x => x.toLowerCase() === t.toLowerCase())) { S.tags.push(t); save(); }
-    if (t) { const cur = (S.reviews[reviewDate] || {}).tags || []; const name = [...BASE_TAGS, ...S.tags].find(x => x.toLowerCase() === t.toLowerCase()); if (!cur.includes(name)) patchReview({ tags: [...cur, name] }); render(); }
+    if (t) { const cur = (S.reviews[reviewDate] || {}).tags || [], name = [...BASE_TAGS, ...S.tags].find(x => x.toLowerCase() === t.toLowerCase()); if (!cur.includes(name)) patchReview({ tags: [...cur, name] }); render(); }
   }
   else if (a === 'fill-notes') {
     const c = S.cache[reviewDate], done = (S.tasks && S.tasks.doneOn[reviewDate]) || [], lines = [];
     const timed = c ? c.events.filter(e => !e.allDay) : [];
     if (timed.length) lines.push('Meetings: ' + timed.map(e => `${e.title} (${timeStr(e.start)})`).join(', '));
     if (done.length) lines.push('Done: ' + done.map(t => t.title).join(', '));
-    const cur = (S.reviews[reviewDate] || {}).did || '';
-    const add = lines.filter(l => !cur.includes(l));
+    const cur = (S.reviews[reviewDate] || {}).did || '', add = lines.filter(l => !cur.includes(l));
     if (add.length) { patchReview({ did: (cur ? cur.trimEnd() + '\n' : '') + add.join('\n') }); render(); }
   }
   else if (a === 'clear-review') { if (confirm('Clear this day\'s review?')) { delete S.reviews[reviewDate]; save(); render(); } }
@@ -694,15 +903,18 @@ async function act(a) {
     saveConn();
     const out = $('checkOut'); out.innerHTML = '<p class="muted">Checking…</p>';
     try {
-      const r = await api('/api/status');
+      const r = await api('/api/status'), sc = r.calendarScopes || '';
+      const full = /calendar\.events/.test(sc) && /gmail\.readonly/.test(sc);
       const lines = ['Worker reachable.',
-        r.calendarConnected ? 'Google Calendar: connected.' : 'Google Calendar: <b>not connected yet</b>. Tap “Connect Google Calendar”.',
+        !r.calendarConnected ? 'Google Calendar and Gmail: <b>not connected yet</b>. Tap “Connect Google (Calendar and Gmail)”.'
+          : full ? 'Google Calendar and Gmail: connected, including adding events.' : 'Google Calendar: connected, but <b>Gmail and adding events are not granted yet</b>. Tap “Connect Google (Calendar and Gmail)” again and approve.',
         r.connected ? 'Google Health (sleep, steps): connected.' : 'Google Health: <b>not connected</b>. Open Calorie tracker → Settings → Connect Google Health.',
-        r.notion ? 'Notion: set up on the Worker.' : 'Notion: <b>not set up</b> on the Worker yet.'];
-      out.innerHTML = `<div class="${r.calendarConnected && r.connected && r.notion ? 'okbox' : 'errbox'}">${lines.join('<br>')}</div>`;
+        r.notion ? 'Notion: set up on the Worker.' : 'Notion: <b>not set up</b> on the Worker yet.',
+        r.meetingsDb ? 'Meetings database: set up.' : 'Meetings database: <b>not set up</b> on the Worker yet.'];
+      out.innerHTML = `<div class="${r.calendarConnected && full && r.connected && r.notion && r.meetingsDb ? 'okbox' : 'errbox'}">${lines.join('<br>')}</div>`;
     } catch (e) { out.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; }
   }
-  else if (a === 'sync-all') { saveConn(); await syncHealth(30); loadDay(view === 'review' ? reviewDate : viewDate); }
+  else if (a === 'sync-all') { saveConn(); await syncHealth(30); loadInbox(); loadDay(view === 'review' ? reviewDate : viewDate); }
   else if (a === 'export') exportData();
   else if (a === 'import') $('importFile').click();
   else if (a === 'demo-on') { loadDemo(); render(); toast('Demo data loaded'); }
@@ -719,7 +931,7 @@ function toast(msg, label, fn) {
   clearTimeout(toastTimer);
   $('toast').innerHTML = `<div class="toast"><span>${esc(msg)}</span>${label ? `<button id="toastBtn">${esc(label)}</button>` : ''}</div>`;
   if (label) $('toastBtn').onclick = () => { fn(); $('toast').innerHTML = ''; };
-  toastTimer = setTimeout(() => { $('toast').innerHTML = ''; }, label ? 7000 : 3500);
+  toastTimer = setTimeout(() => { $('toast').innerHTML = ''; }, label ? 9000 : 3500);
 }
 
 /* ---------- backup / demo / refresh ---------- */
@@ -751,13 +963,19 @@ function loadDemo() {
   const ev = (id, title, h1, m1, h2, m2, extra = {}) => ({ id, uid: id, calendar: 'Demo', title, start: at(h1, m1), end: at(h2, m2), allDay: false, location: '', description: '', video: null, link: null, response: 'accepted', busy: true, recurring: false, organizer: '', attendees: [], attendeeCount: 0, ...extra });
   S.cache[t] = { at: Date.now(), calendars: ['Demo'], errors: [], events: [
     { ...ev('d0', 'Maria’s birthday', 0, 0, 0, 0), allDay: true, start: t, end: addDays(t, 1) },
-    ev('d1', 'Team standup', 9, 30, 9, 45, { video: 'https://meet.example/standup', organizer: 'Sam Lee', attendeeCount: 6, attendees: [{ name: 'Sam Lee', email: 'sam@example.com', response: 'accepted', self: false, organizer: true, optional: false }, { name: 'Priya Nair', email: 'priya@example.com', response: 'tentative', self: false, organizer: false, optional: false }, { name: 'Jonas Weber', email: 'jonas@example.com', response: 'needsAction', self: false, organizer: false, optional: true }], description: 'Quick sync. Agenda: blockers, launch date.\nNotes: https://docs.example/standup' }),
+    ev('d1', 'Team standup', 9, 30, 9, 45, { video: 'https://meet.example/standup', organizer: 'Sam Lee', attendeeCount: 6, attendees: [{ name: 'Sam Lee', email: 'sam@example.com', response: 'accepted', self: false, organizer: true, optional: false }, { name: 'Priya Nair', email: 'priya@example.com', response: 'tentative', self: false, organizer: false, optional: false }], description: 'Quick sync. Agenda: blockers, launch date.\nNotes: https://docs.example/standup' }),
     ev('d2', 'Pitch review with Acme', 11, 0, 12, 0, { location: 'Meeting room 2', response: 'tentative', attendeeCount: 3, attendees: [{ name: 'Dana Fox', email: 'dana@acme.example', response: 'accepted', self: false, organizer: true, optional: false }], organizer: 'Dana Fox', description: 'Walk through the deck and agree next steps.' }),
+    ev('d5', 'Design check-in', 11, 30, 12, 0, { attendeeCount: 2 }),
     ev('d3', 'Lunch with Tom', 13, 0, 14, 0, { location: 'Café Central', busy: false }),
     ev('d4', '1:1 with manager', 15, 30, 16, 0, { video: 'https://meet.example/11', attendeeCount: 2 })] };
   const task = (id, title, due, status = 'Not started', types = ['Work']) => ({ id: 'demo-' + id, title, status, due, done: null, types, tags: [], waiting: false, crm: false, people: [], next: '', url: '#' });
-  S.tasks = { at: Date.now(), open: [task('1', 'Send proposal to Acme', addDays(t, -1)), task('2', 'Prepare pitch notes', t), task('3', 'Book dentist', t, 'Not started', ['Personal']), { ...task('8', 'Dana to confirm budget', null), waiting: true, crm: true }, task('4', 'Review budget', null, 'In progress'), task('5', 'Renew passport', addDays(t, 2), 'Not started', ['Personal']), task('6', 'Plan Q1 offsite', null)],
+  S.tasks = { at: Date.now(), open: [task('1', 'Send proposal to Acme', addDays(t, -1)), task('2', 'Prepare pitch notes', t), task('3', 'Book dentist', t, 'Not started', ['Personal']), task('9', 'Call the bank', `${t}T16:30:00`, 'Not started', ['Personal']), { ...task('8', 'Dana to confirm budget', null), waiting: true, crm: true }, task('4', 'Review budget', null, 'In progress'), task('5', 'Renew passport', addDays(t, 2), 'Not started', ['Personal']), task('6', 'Plan Q1 offsite', null)],
     doneOn: { [t]: [{ ...task('7', 'Reply to Dana', t), status: 'Done', done: t }] } };
+  const now = Date.now();
+  S.inbox = { at: now, account: 'me@example.com', unread: 3, messages: [
+    { id: 'm1', threadId: 'a1', from: { name: 'Dana Fox', email: 'dana@acme.example' }, subject: 'Re: pilot terms', snippet: 'Thanks for sending this over. Can we move the kickoff to the week of the 16th? Legal wants one more look.', at: now - 36e5, starred: true, crm: { id: 'demo-p1', name: 'Dana Fox', tier: 'A - Key' } },
+    { id: 'm2', threadId: 'a2', from: { name: 'Bank', email: 'noreply@bank.example' }, subject: 'Your October statement is ready', snippet: 'Your statement is now available in online banking.', at: now - 5 * 36e5, starred: false, crm: null },
+    { id: 'm3', threadId: 'a3', from: { name: 'Notion', email: 'team@notion.example' }, subject: 'What’s new this month', snippet: 'New AI features, calendar improvements and more.', at: now - 3 * 864e5, starred: false, crm: null }] };
   for (let i = 1; i <= 21; i++) {
     const d = addDays(t, -i), seed = (i * 37) % 11, mood = 1 + ((seed + i) % 5);
     S.health[d] = Object.assign(S.health[d] || {}, { steps: 4000 + seed * 900, sleepMinutes: 360 + seed * 14, sleepDeepMin: 60 + seed, sleepRemMin: 80 + seed * 2, restingHr: 55 + (seed % 5), caloriesOut: 2300 + seed * 60 });
@@ -768,7 +986,7 @@ function loadDemo() {
   S.demo = true; S.status = {}; save();
 }
 function removeDemo() {
-  S.demo = false; S.cache = {}; S.tasks = null; S.health = {}; S.status = {};
+  S.demo = false; S.cache = {}; S.tasks = null; S.inbox = null; S.health = {}; S.status = {};
   for (const [d, r] of Object.entries(S.reviews)) if (r.demo) delete S.reviews[d];
   save();
 }
@@ -781,20 +999,22 @@ async function forceRefresh() {
 }
 
 /* ---------- boot ---------- */
+applyTheme();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => { /* app works without it */ });
 }
 render();
 if (connected()) {
-  loadDay(viewDate);
+  loadDay(viewDate); loadInbox();
   if (!Object.keys(S.health).length) syncHealth(30); else if (Date.now() - S.healthAt > 30 * 60 * 1000) syncHealth(7);
 }
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible' || !connected() || $('overlay').innerHTML) return;
   const d = view === 'review' ? reviewDate : viewDate, c = S.cache[d];
-  if (view !== 'settings' && (!c || Date.now() - c.at > 5 * 60 * 1000)) loadDay(d);
+  if ((view === 'today' || view === 'review') && (!c || Date.now() - c.at > 5 * 60 * 1000)) loadDay(d);
+  if (view === 'inbox' && (!S.inbox || Date.now() - S.inbox.at > 5 * 60 * 1000)) loadInbox();
 });
-setInterval(() => { if (view === 'today' && viewDate === today() && !$('overlay').innerHTML && !document.hidden) render(); }, 60 * 1000); // moves the "next" highlight along
+setInterval(() => { if (view === 'today' && viewDate === today() && !$('overlay').innerHTML && !document.hidden) render(); }, 60 * 1000); // keeps the now-line and "next" label current
 </script>
 </body>
 </html>
