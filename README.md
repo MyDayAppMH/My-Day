@@ -3,6 +3,7 @@
 A small personal app for an Android phone. One screen for the day, plus a review afterwards.
 
 - **Day:** a week strip, then your to-dos and a timeline of the day with meetings and timed tasks. Tap a meeting for a brief: who is invited, the description, **who they are in your Notion CRM**, recent email with them, and your private prep notes. Tap an empty slot or the **+** button to add an event, a task or a meeting note.
+- **Readiness for training (1 to 10):** a card at the top of today. It scores last night's sleep (35%), HRV (25%), resting heart rate (25%) and the last two days' training load (15%), each against your own 28-day normal, so it needs about a week of data to learn you. About 7 is an ordinary day; 8 to 10 means good to go hard, 4 to 5 keep it light, 1 to 3 rest. Skin temperature, breathing rate or blood oxygen well off your normal hold the score at 5 at most. Tap the card to see each part. It is a rule of thumb from your own numbers, not medical advice.
 - **Inbox:** your unread mail from the main (Primary) inbox, newest first, with sender, subject and a preview. Social (LinkedIn and similar), promotions, updates and forums are left out. Mail from people in your CRM is marked. Tap a mail to open it in Gmail, or **+ Task** to turn it into a Notion task linked to the sender.
 - **Review:** log the day, usually next morning: mood, energy, what it was about, what happened. History shows mood over time and simple patterns against sleep, sport and steps.
 - **Portfolio** (under More): your crypto holdings with live prices from CoinMarketCap, like the CoinMarketCap app: price and 24 h change per coin, value, amount, and a total. **Hide amounts** blanks the numbers on screen. The amounts you hold are typed or pasted into the app and stay on your phone; only prices come from CoinMarketCap.
@@ -55,7 +56,7 @@ It has no server of its own. It talks to the **Worker from the Calorie tracker r
 3. **Refresh everything**, then open **Day**.
 
 ## Using it
-- **Week strip:** tap a day to see it, ‹ › move a week. Today is outlined. **Today** brings you back.
+- **Week strip:** tap a day to see it, ‹ › move a week. Today is outlined. **Today** brings you back. **Swipe left or right** on the Day tab to move between days. **Settings → Display** can show Mon to Fri only (a weekend day always shows all seven).
 - **To-dos** are in a collapsible card: overdue and due today first, the rest under "more". Tasks with a due *time* also appear on the timeline. Tick a task and it is marked Done in Notion, with Undo. Backlog and Done are left out, like your Notion views.
 - **Add:** the **+** button offers New event, New task and New meeting note. Tapping an empty slot on the timeline starts an event at that time. An event with guests sends them an invitation; one without guests emails nobody. A task's sheet has **Block time**, which prefills an event.
 - **Meeting notes:** from a meeting's sheet, **New meeting note** creates a page in your Notion Meetings database with the meeting's name, date and time, and the attendees who are in your CRM, then offers **Open in Notion**. From the **+** menu or **More** it creates a blank note for now.

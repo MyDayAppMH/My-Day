@@ -170,6 +170,18 @@ svg text { fill: var(--muted); font-size: 10px; font-family: inherit; }
 .tot { font-size: 32px; font-weight: 600; letter-spacing: -.5px; }
 .pline { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 0 2px; margin: 0 0 8px; font-size: 13px; color: var(--muted); }
 .pline b { color: var(--ink); font-weight: 500; }
+.rd { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px 14px; }
+.rd .n { font-size: 34px; font-weight: 600; line-height: 1; min-width: 52px; }
+.rd .n small { font-size: 14px; font-weight: 400; color: var(--muted); }
+.rd .t b { display: block; font-weight: 600; }
+.rd .t span { display: block; font-size: 12px; color: var(--muted); }
+.bar2 { height: 6px; border-radius: 3px; background: var(--soft); overflow: hidden; margin-top: 4px; }
+.bar2 i { display: block; height: 100%; background: var(--ink); border-radius: 3px; }
+@keyframes fromRight { from { transform: translateX(32px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fromLeft { from { transform: translateX(-32px); opacity: 0; } to { transform: none; opacity: 1; } }
+.slide-next { animation: fromRight .2s ease-out; }
+.slide-prev { animation: fromLeft .2s ease-out; }
+@media (prefers-reduced-motion: reduce) { .slide-next, .slide-prev { animation: none; } }
 .back { border: 0; background: none; color: var(--muted); font-size: 14px; padding: 4px 0; }
 
 .set h3 { margin: 0 0 8px; font-size: 15px; }
@@ -190,7 +202,7 @@ svg text { fill: var(--muted); font-size: 10px; font-family: inherit; }
 
 <script>
 'use strict';
-const BUILD = '2026-11-02.5';
+const BUILD = '2026-11-03.2';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -236,7 +248,7 @@ function mailTime(ms) {
 }
 
 /* ---------- state ---------- */
-function blank() { return { reviews: {}, prep: {}, health: {}, cache: {}, tasks: null, inbox: null, tags: [], crypto: { holdings: [], quotes: {}, at: 0 }, settings: { baseUrl: '', appKey: '', theme: 'dark', hideBalances: false }, status: {}, healthAt: 0, demo: false }; }
+function blank() { return { reviews: {}, prep: {}, health: {}, cache: {}, tasks: null, inbox: null, tags: [], crypto: { holdings: [], quotes: {}, at: 0 }, settings: { baseUrl: '', appKey: '', theme: 'dark', hideBalances: false, weekDays: 7 }, status: {}, healthAt: 0, demo: false }; }
 function load() {
   try { const o = JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); const s = Object.assign(blank(), o); s.settings = Object.assign(blank().settings, o.settings); return s; }
   catch { return blank(); }
@@ -345,10 +357,17 @@ function render() {
   const app = $('app');
   app.innerHTML = { today: dayHtml, inbox: inboxHtml, review: reviewHtml, more: moreHtml, history: historyHtml, settings: settingsHtml, portfolio: portfolioHtml }[view]();
   bind(app); bind($('fabslot'));
+  if (slideDir && view === 'today') { app.classList.remove('slide-next', 'slide-prev'); void app.offsetWidth; app.classList.add('slide-' + slideDir); }
+  slideDir = '';
   if (view === 'today' && viewDate === today() && !didScroll) {
     const n = document.querySelector('.now');
     if (n) { didScroll = true; window.scrollTo(0, Math.max(0, n.getBoundingClientRect().top + window.scrollY - 260)); }
   }
+}
+let slideDir = '';
+function changeDay(delta) {
+  viewDate = addDays(viewDate, delta); slideDir = delta > 0 ? 'next' : 'prev';
+  render(); window.scrollTo(0, 0); loadDay(viewDate);
 }
 function go(v) {
   if (v === 'review' && view !== 'review') reviewDate = addDays(today(), -1); // each visit starts on the previous day; use › for today
@@ -373,8 +392,9 @@ function pill(extra = '') {
 
 /* ----- day (timeline) ----- */
 function weekHtml(date) {
-  const mon = weekStart(date), t = today();
-  const days = [0, 1, 2, 3, 4, 5, 6].map(i => addDays(mon, i));
+  const mon = weekStart(date), t = today(), dow = parseYmd(date).getDay();
+  const n = S.settings.weekDays === 5 && dow >= 1 && dow <= 5 ? 5 : 7; // a weekend day always shows the full week so it stays visible
+  const days = Array.from({ length: n }, (_, i) => addDays(mon, i));
   return `<div class="wk"><button class="ar" data-act="wprev" aria-label="Previous week">‹</button>${days.map(d => `<button class="wd ${d === date ? 'on' : ''} ${d === t ? 'today' : ''}" data-day="${d}">${parseYmd(d).toLocaleDateString([], { weekday: 'narrow' })}<b>${parseYmd(d).getDate()}</b></button>`).join('')}<button class="ar" data-act="wnext" aria-label="Next week">›</button></div>`;
 }
 function healthLine(d) {
@@ -470,13 +490,75 @@ function dayHtml() {
     ${weekHtml(d)}
     <div class="stack">
     ${needReview ? `<div class="nudge"><span><b>How was yesterday?</b><span class="muted" style="font-size:14px">30 seconds to log it.</span></span><button class="btn day" data-act="review-yesterday">Log it</button></div>` : ''}
-    ${isToday ? healthLine(d) : ''}${isToday ? portfolioLine() : ''}
+    ${isToday ? readinessCard(d) : ''}${isToday ? healthLine(d) : ''}${isToday ? portfolioLine() : ''}
     ${allDay.length ? `<div class="allday">${allDay.map(e => `<span>${esc(e.title)}</span>`).join('')}</div>` : ''}
     ${trayHtml(d, b)}
     ${sh ? `<p class="shape"><b>${sh.count} meeting${sh.count > 1 ? 's' : ''}</b> · ${dur(sh.mins)} booked${sh.free ? ` · longest free block <b>${timeStr(sh.free[0])}–${timeStr(sh.free[1])}</b>` : ''}</p>` : ''}
     ${calMsg}${timelineHtml(d, timed, b.timed)}${stale}
     ${c && c.errors && c.errors.length ? `<div class="errbox">Some calendars could not be read: ${esc(c.errors.map(e => e.calendar).join(', '))}</div>` : ''}
     </div>`;
+}
+
+/* ----- readiness for training (1 to 10), from your own sleep, resting heart rate, HRV and recent load ----- */
+const median = a => { const s = a.slice().sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+// Your normal for a metric: the median of up to 28 earlier days, and how much it usually varies (robust spread, with a floor so tiny wobbles do not count).
+function baseline(metric, date, floor) {
+  const v = [];
+  for (let i = 1; i <= 28; i++) { const x = (S.health[addDays(date, -i)] || {})[metric]; if (typeof x === 'number') v.push(x); }
+  if (v.length < 7) return { n: v.length, ok: false };
+  const med = median(v), mad = median(v.map(x => Math.abs(x - med))) * 1.4826;
+  return { n: v.length, ok: true, med, sd: Math.max(mad, floor) };
+}
+const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+function readiness(date) {
+  const h = S.health[date] || {};
+  if (typeof h.sleepMinutes !== 'number') return { pending: true };
+  const parts = [];
+  // Sleep: nothing under 4 hours, full marks at 8, with a little credit for deep and REM making up around 40 percent of it.
+  const dScore = clamp((h.sleepMinutes - 240) / 240, 0, 1) * 100;
+  const stage = typeof h.sleepDeepMin === 'number' ? (h.sleepDeepMin + (h.sleepRemMin || 0)) / h.sleepMinutes : null;
+  parts.push({ k: 'sleep', name: 'Sleep', w: 0.35, pts: stage == null ? dScore : dScore * 0.8 + Math.min(1, stage / 0.4) * 20, text: `${dur(h.sleepMinutes)}${stage != null ? `, ${Math.round(stage * 100)}% deep and REM` : ''}`, hint: 'Full marks from 8 hours.' });
+  const bHrv = baseline('hrv', date, 3), bRhr = baseline('restingHr', date, 1.5);
+  if (typeof h.hrv === 'number' && bHrv.ok) { const z = (h.hrv - bHrv.med) / bHrv.sd; parts.push({ k: 'hrv', name: 'Heart rate variability', w: 0.25, pts: clamp(60 + 20 * z, 0, 100), text: `${Math.round(h.hrv)} ms, ${h.hrv >= bHrv.med ? '+' : '−'}${Math.abs(Math.round(h.hrv - bHrv.med))} vs your usual ${Math.round(bHrv.med)}`, hint: 'Higher than your normal is better.' }); }
+  if (typeof h.restingHr === 'number' && bRhr.ok) { const z = (h.restingHr - bRhr.med) / bRhr.sd; parts.push({ k: 'rhr', name: 'Resting heart rate', w: 0.25, pts: clamp(60 - 20 * z, 0, 100), text: `${Math.round(h.restingHr)} bpm, ${h.restingHr >= bRhr.med ? '+' : '−'}${Math.abs(Math.round(h.restingHr - bRhr.med))} vs your usual ${Math.round(bRhr.med)}`, hint: 'Lower than your normal is better.' }); }
+  // Recent load: the last two days of activity against your own 28-day average.
+  const load = [1, 2].map(i => (S.health[addDays(date, -i)] || {}).activeKcal).filter(x => typeof x === 'number'), bLoad = baseline('activeKcal', date, 50);
+  if (load.length && bLoad.ok) { const ratio = (load.reduce((a, b) => a + b, 0) / load.length) / bLoad.med; parts.push({ k: 'load', name: 'Recent training load', w: 0.15, pts: clamp(100 - (ratio - 0.7) * 100, 20, 100), text: ratio <= 0.85 ? 'lighter than usual' : ratio <= 1.15 ? 'about your usual' : `${Math.round((ratio - 1) * 100)}% above your usual`, hint: 'A heavy last two days lowers it.' }); }
+  const wSum = parts.reduce((a, p) => a + p.w, 0), base = parts.reduce((a, p) => a + p.w * p.pts, 0) / wSum;
+  // Body signals that look like the start of an illness cap the score.
+  const flags = [];
+  if (typeof h.skinTempDelta === 'number' && h.skinTempDelta >= 0.8) flags.push(`skin temperature ${h.skinTempDelta.toFixed(1)}°C above your normal`);
+  const bBr = baseline('breathingRate', date, 0.4);
+  if (typeof h.breathingRate === 'number' && bBr.ok && h.breathingRate - bBr.med >= 1.5) flags.push(`breathing rate up ${(h.breathingRate - bBr.med).toFixed(1)} per minute`);
+  const bOx = baseline('spo2', date, 0.5);
+  if (typeof h.spo2 === 'number' && bOx.ok && bOx.med - h.spo2 >= 2) flags.push(`blood oxygen ${(bOx.med - h.spo2).toFixed(1)} points below usual`);
+  // An average night with average vitals lands around 7. With only sleep to go on, it cannot claim more than 7.
+  let raw = 1 + 9 * clamp((base - 10) / 90, 0, 1);
+  if (parts.length < 3) raw = Math.min(raw, 7);
+  const capped = flags.length > 0 && raw > 5;
+  const score = clamp(Math.round(capped ? 5 : raw), 1, 10);
+  const label = score >= 8 ? 'Good to go hard' : score >= 6 ? 'Normal training' : score >= 4 ? 'Keep it light' : 'Rest or recover';
+  const missing = [!parts.some(p => p.k === 'hrv') && 'HRV', !parts.some(p => p.k === 'rhr') && 'resting heart rate', !parts.some(p => p.k === 'load') && 'training load'].filter(Boolean);
+  return { score, label, parts, flags, capped, missing, base: Math.round(base), learning: Math.min(bHrv.n, bRhr.n) };
+}
+function readinessColor(sc) { return sc >= 8 ? 'var(--good)' : sc >= 6 ? 'var(--ink)' : sc >= 4 ? 'var(--warn)' : 'var(--danger)'; }
+function readinessCard(date) {
+  const r = readiness(date);
+  if (r.pending) return `<div class="rd" style="cursor:default"><span class="n muted">–<small>/10</small></span><span class="t"><b>Readiness for training</b><span>Waiting for last night's sleep data. Refresh after your watch has synced.</span></span></div>`;
+  const note = r.flags.length ? `Body signals look off: ${r.flags[0]}.` : r.missing.length ? `Based on ${r.parts.map(p => p.name.toLowerCase()).join(' and ')}.` : 'Sleep, HRV, resting heart rate and recent load.';
+  return `<button class="rd" data-act="readiness"><span class="n" style="color:${readinessColor(r.score)}">${r.score}<small>/10</small></span><span class="t"><b>${r.label}</b><span>${esc(note)}</span></span></button>`;
+}
+function openReadiness() {
+  const r = readiness(viewDate);
+  if (r.pending) return openSheet(`<h2>Readiness for training</h2><p class="muted">There is no sleep figure for ${esc(dayLabel(viewDate).toLowerCase())} yet. It appears once your watch has synced last night's sleep.</p><div class="row" style="margin-top:14px"><button class="btn day" id="rdOk">Close</button></div>`) || ($('rdOk').onclick = closeSheet);
+  openSheet(`<h2><span style="color:${readinessColor(r.score)}">${r.score}/10</span> · ${r.label}</h2>
+    <p class="muted" style="margin:2px 0 8px">${esc(longDate(viewDate))}. Each part is scored against your own normal over the last 28 days.</p>
+    ${r.flags.length ? `<div class="errbox">${r.capped ? 'The score is held at 5 because ' : 'Worth watching: '}${esc(r.flags.join(', '))}. These can come before an illness. Treat today as a lighter day.</div>` : ''}
+    ${r.parts.map(p => `<div style="margin-top:12px"><div style="display:flex;justify-content:space-between;gap:8px"><b style="font-weight:600">${esc(p.name)}</b><span class="muted num">${Math.round(p.pts)} of 100 · ${Math.round(p.w / r.parts.reduce((a, q) => a + q.w, 0) * 100)}% of the score</span></div><div class="bar2"><i style="width:${Math.round(p.pts)}%"></i></div><div class="muted" style="font-size:13px;margin-top:3px">${esc(p.text)}. ${esc(p.hint)}</div></div>`).join('')}
+    ${r.missing.length ? `<p class="muted" style="font-size:13px;margin-top:14px">Not included yet: ${esc(r.missing.join(', '))}${r.learning < 7 ? `. Your baseline needs at least 7 days of data (you have ${r.learning}).` : '. No figure for it today.'}</p>` : ''}
+    <p class="muted" style="font-size:12px;margin-top:14px">A rule of thumb from your own numbers, not medical advice. If you feel unwell, listen to your body over this score.</p>
+    <div class="row" style="margin-top:14px"><button class="btn day" id="rdOk">Close</button></div>`);
+  $('rdOk').onclick = closeSheet;
 }
 
 /* ----- inbox ----- */
@@ -778,8 +860,12 @@ function settingsHtml() {
       </div>
       <div id="checkOut"></div>
       ${row('Calendar', st.cal)}${row('Tasks', st.tasks)}${row('Mail', st.mail)}${row('Health', st.health)}</div>
-    <div class="card"><h3>Theme</h3>
-      <div class="seg">${[['dark', 'Dark'], ['light', 'Light'], ['auto', 'Match phone']].map(([k, l]) => `<button data-theme-set="${k}" class="${S.settings.theme === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+    <div class="card"><h3>Display</h3>
+      <span class="lbl2" style="margin-top:0">Theme</span>
+      <div class="seg">${[['dark', 'Dark'], ['light', 'Light'], ['auto', 'Match phone']].map(([k, l]) => `<button data-theme-set="${k}" class="${S.settings.theme === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+      <span class="lbl2">Week strip on the Day tab</span>
+      <div class="seg">${[[7, '7 days'], [5, 'Mon to Fri']].map(([k, l]) => `<button data-week-set="${k}" class="${S.settings.weekDays === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+      <p class="muted" style="font-size:12px;margin-top:8px">Swipe left or right on the Day tab to move between days. A weekend day always shows the full week.</p></div>
     <div class="card"><h3>Your tags</h3>
       <p class="muted">Quick tags in the Review. Add your own from the Review tab; tap one of yours here to remove it.</p>
       <div class="chips">${[...SPORT_TAGS, ...BASE_TAGS].map(t => `<span class="chip">${esc(t)}</span>`).join('')}${S.tags.map(t => `<button class="chip on" data-tagdel="${esc(t)}">${esc(t)} ✕</button>`).join('')}</div></div>
@@ -1026,6 +1112,7 @@ function bind(root) {
   root.querySelectorAll('[data-rev]').forEach(b => b.onclick = () => { reviewDate = b.dataset.rev; view = 'review'; render(); window.scrollTo(0, 0); loadDay(reviewDate); });
   root.querySelectorAll('[data-hist]').forEach(b => b.onclick = () => { histDays = +b.dataset.hist; render(); });
   root.querySelectorAll('[data-tagdel]').forEach(b => b.onclick = () => { S.tags = S.tags.filter(t => t !== b.dataset.tagdel); save(); render(); });
+  root.querySelectorAll('[data-week-set]').forEach(b => b.onclick = () => { S.settings.weekDays = +b.dataset.weekSet; save(); render(); });
   root.querySelectorAll('[data-theme-set]').forEach(b => b.onclick = () => { S.settings.theme = b.dataset.themeSet; save(); applyTheme(); render(); });
   root.querySelectorAll('[data-act]').forEach(b => b.onclick = () => act(b.dataset.act));
   if (view === 'review') bindReview(root);
@@ -1058,6 +1145,7 @@ async function act(a) {
   else if (a === 'review-yesterday') { reviewDate = addDays(today(), -1); go('review'); }
   else if (a === 'add-task') openAddTask();
   else if (a === 'fab') openFabMenu();
+  else if (a === 'readiness') openReadiness();
   else if (a === 'new-note-now') startMeetingNote({ title: 'Meeting', start: new Date().toISOString() });
   else if (a === 'new-tag') {
     const t = (prompt('New tag name') || '').trim().slice(0, 20);
@@ -1160,10 +1248,10 @@ function loadDemo() {
     { id: 'm3', threadId: 'a3', from: { name: 'Tom Reid', email: 'tom@example.com' }, subject: 'Lunch on Thursday?', snippet: 'Are you free around one? Café Central again?', at: now - 3 * 864e5, starred: false, crm: null }] };
   for (let i = 1; i <= 21; i++) {
     const d = addDays(t, -i), seed = (i * 37) % 11, mood = 1 + ((seed + i) % 5);
-    S.health[d] = Object.assign(S.health[d] || {}, { steps: 4000 + seed * 900, sleepMinutes: 360 + seed * 14, sleepDeepMin: 60 + seed, sleepRemMin: 80 + seed * 2, restingHr: 55 + (seed % 5), caloriesOut: 2300 + seed * 60 });
+    S.health[d] = Object.assign(S.health[d] || {}, { steps: 4000 + seed * 900, sleepMinutes: 360 + seed * 14, sleepDeepMin: 60 + seed, sleepRemMin: 80 + seed * 2, restingHr: 55 + (seed % 5), caloriesOut: 2300 + seed * 60, activeKcal: 500 + seed * 35, hrv: 40 + (seed % 7) * 2 });
     if (i % 4 !== 0) S.reviews[d] = { mood: Math.min(5, Math.max(1, S.health[d].sleepMinutes >= 420 ? mood + 1 : mood)), energy: 1 + (seed % 5), tags: [['Work'], ['Work', 'Run'], ['Social', 'Family', 'Golf 9'], ['Rest'], ['Work', 'Learning', 'Padel']][i % 5], did: ['Busy day of meetings, then a run.', 'Dinner with friends.', 'Quiet day, caught up on admin.', 'Long planning session.'][i % 4], win: i % 3 ? '' : 'Finished the report', updatedAt: Date.now() - i, demo: true };
   }
-  S.health[t] = Object.assign(S.health[t] || {}, { sleepMinutes: 432, sleepDeepMin: 74, sleepRemMin: 98, restingHr: 56 });
+  S.health[t] = Object.assign(S.health[t] || {}, { sleepMinutes: 432, sleepDeepMin: 74, sleepRemMin: 98, restingHr: 56, hrv: 46 });
   S.health[addDays(t, -1)] = Object.assign(S.health[addDays(t, -1)] || {}, { steps: 9120 });
   S.crypto = { holdings: [{ id: 1, symbol: 'BTC', name: 'Bitcoin', amount: 0.05 }, { id: 1027, symbol: 'ETH', name: 'Ethereum', amount: 1.2 }, { id: 74, symbol: 'DOGE', name: 'Dogecoin', amount: 1500 }], quotes: {}, at: 0 };
   S.demo = true; S.status = {}; save();
@@ -1180,6 +1268,21 @@ async function forceRefresh() {
   } catch { /* ignore */ }
   location.href = location.pathname + '?v=' + Date.now();
 }
+
+/* ---------- swipe between days ---------- */
+let swipe = null;
+document.addEventListener('touchstart', e => {
+  const t = e.touches[0];
+  swipe = view === 'today' && e.touches.length === 1 && !$('overlay').innerHTML && t.clientX > 24 && t.clientX < innerWidth - 24 // leave the screen edges to Android's own back gesture
+    ? { x: t.clientX, y: t.clientY, at: Date.now() } : null;
+}, { passive: true });
+document.addEventListener('touchend', e => {
+  if (!swipe) return;
+  const t = e.changedTouches[0], dx = t.clientX - swipe.x, dy = t.clientY - swipe.y, quick = Date.now() - swipe.at < 800;
+  swipe = null;
+  if (quick && Math.abs(dx) > 70 && Math.abs(dx) > 1.6 * Math.abs(dy)) changeDay(dx < 0 ? 1 : -1);
+}, { passive: true });
+document.addEventListener('touchcancel', () => { swipe = null; }, { passive: true });
 
 /* ---------- boot ---------- */
 applyTheme();
