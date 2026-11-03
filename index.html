@@ -128,14 +128,20 @@ textarea.field { min-height: 92px; resize: vertical; }
 .menu i { font-size: 22px; font-style: normal; width: 26px; text-align: center; }
 .menu small { display: block; color: var(--muted); font-size: 12px; }
 
-.mail { display: flex; align-items: stretch; background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-top: 8px; }
-.mail a.mb { flex: 1; min-width: 0; text-decoration: none; color: var(--ink); padding: 10px 6px 10px 14px; }
+.mail { background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-top: 8px; }
+.mrow { display: flex; align-items: stretch; }
+.mail .mb { flex: 1; min-width: 0; text-align: left; background: none; border: 0; color: var(--ink); padding: 10px 6px 10px 14px; }
 .mail .l1 { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
 .mail .l1 b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mail .l1 span { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .mail .l2 { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mail .l3 { font-size: 13px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mail.open .l2 { white-space: normal; font-weight: 600; }
+.mail.open .l3 { display: none; }
 .mail .mt { flex: none; width: 60px; border: 0; border-left: 1px solid var(--line); background: none; color: var(--muted); font-size: 12px; }
+.mexp { border-top: 1px solid var(--line); padding: 10px 14px 12px; }
+.mbody { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; max-height: 55vh; overflow: auto; }
+.mact { display: flex; gap: 8px; margin-top: 12px; }
 .thread { display: block; text-decoration: none; padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; }
 .thread:first-of-type { border-top: 0; }
 
@@ -202,7 +208,7 @@ svg text { fill: var(--muted); font-size: 10px; font-family: inherit; }
 
 <script>
 'use strict';
-const BUILD = '2026-11-03.2';
+const BUILD = '2026-11-03.3';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -562,6 +568,22 @@ function openReadiness() {
 }
 
 /* ----- inbox ----- */
+const mailBodies = {}, mailOpen = new Set(); // mail text is kept in memory only, never saved on the phone
+function toggleMail(id) {
+  if (mailOpen.has(id)) mailOpen.delete(id);
+  else { mailOpen.add(id); if (!mailBodies[id] || mailBodies[id].error) loadMailBody(id); }
+  render();
+}
+async function loadMailBody(id) {
+  mailBodies[id] = { loading: true };
+  try { mailBodies[id] = S.demo ? demoMailBody(id) : await post('/api/mail/message', { id }); }
+  catch (e) { mailBodies[id] = { error: e.message }; }
+  if (view === 'inbox') render();
+}
+function demoMailBody(id) {
+  const t = { m1: 'Hi Matthias,\n\nThanks for sending this over. Can we move the kickoff to the week of the 16th? Legal wants one more look at the terms before we sign.\n\nBest,\nDana', m2: 'Your October statement is now available in online banking. Sign in to view it.', m3: 'Are you free around one on Thursday? Café Central again?\n\nTom' };
+  return { text: t[id] || 'Demo mail.', truncated: false, files: id === 'm1' ? [{ name: 'Terms v3.pdf', size: 2048 }] : [] };
+}
 const mailLink = m => `https://mail.google.com/mail/u/${encodeURIComponent((S.inbox && S.inbox.account) || '0')}/#inbox/${m.threadId}`;
 function inboxHtml() {
   const I = S.inbox, st = S.status.mail, now = Date.now();
@@ -573,11 +595,14 @@ function inboxHtml() {
     ${!I ? `<p class="empty">${connected() ? (st && !st.ok ? '' : 'Loading your inbox…') : 'Connect Google in Settings to see your unread mail.'}</p>` : ''}
     ${st && !st.ok ? `<div class="errbox">${esc(st.message)}${I ? '<br>Showing the copy from ' + new Date(I.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.' : ''}</div>` : ''}
     ${I && !list.length ? '<p class="empty">Nothing here. Inbox zero for this filter.</p>' : ''}
-    ${list.map(m => `<div class="mail"><a class="mb" href="${esc(mailLink(m))}" target="_blank" rel="noopener">
+    ${list.map(m => { const open = mailOpen.has(m.id), b = mailBodies[m.id]; return `<div class="mail ${open ? 'open' : ''}"><div class="mrow"><button class="mb" data-mopen="${esc(m.id)}" aria-expanded="${open}">
       <div class="l1"><b>${esc(m.from.name)}${m.crm ? `<span class="badge day" style="color:var(--ink)">CRM${m.crm.tier ? ' ' + esc(m.crm.tier.split(' ')[0]) : ''}</span>` : ''}${m.starred ? ' ★' : ''}</b><span>${mailTime(m.at)}</span></div>
-      <div class="l2">${esc(m.subject)}</div><div class="l3">${esc(m.snippet)}</div></a>
-      <button class="mt" data-mtask="${esc(m.id)}" aria-label="Make a task from this mail">+ Task</button></div>`).join('')}
-    <p class="muted" style="font-size:12px;margin:12px 2px 0">Your main (Primary) inbox only: social, promotions and updates are left out. Tapping a mail opens it in Gmail. My Day only reads your mail.</p>`;
+      <div class="l2">${esc(m.subject)}</div><div class="l3">${esc(m.snippet)}</div></button>
+      <button class="mt" data-mtask="${esc(m.id)}" aria-label="Make a task from this mail">+ Task</button></div>
+      ${open ? `<div class="mexp">${!b || b.loading ? '<span class="muted">Loading the mail…</span>' : b.error ? `<div class="errbox" style="margin-top:0">${esc(b.error)}</div>`
+        : `<div class="mbody">${linkify(b.text)}</div>${b.truncated ? '<div class="muted" style="font-size:12px;margin-top:6px">Shortened. Open the mail in Gmail for the rest.</div>' : ''}${b.files && b.files.length ? `<div class="muted" style="font-size:12px;margin-top:6px">Attachments: ${esc(b.files.map(f => f.name).join(', '))}</div>` : ''}`}
+        <div class="mact"><a class="btn day" href="${esc(mailLink(m))}" target="_blank" rel="noopener">Open in Gmail</a><button class="btn" data-mopen="${esc(m.id)}">Close</button></div></div>` : ''}</div>`; }).join('')}
+    <p class="muted" style="font-size:12px;margin:12px 2px 0">Your main (Primary) inbox only: social, promotions and updates are left out. Tap a mail to read it here, or open it in Gmail. Reading here does not mark it as read in Gmail. My Day only reads your mail.</p>`;
 }
 
 /* ----- more / history ----- */
@@ -1108,6 +1133,7 @@ function bind(root) {
   root.querySelectorAll('[data-hold]').forEach(b => b.onclick = () => openHolding(+b.dataset.hold));
   root.querySelectorAll('[data-day]').forEach(b => b.onclick = () => { viewDate = b.dataset.day; render(); loadDay(viewDate); });
   root.querySelectorAll('[data-mf]').forEach(b => b.onclick = () => { mailFilter = b.dataset.mf; render(); });
+  root.querySelectorAll('[data-mopen]').forEach(b => b.onclick = () => toggleMail(b.dataset.mopen));
   root.querySelectorAll('[data-mtask]').forEach(b => b.onclick = () => openMailTask(b.dataset.mtask));
   root.querySelectorAll('[data-rev]').forEach(b => b.onclick = () => { reviewDate = b.dataset.rev; view = 'review'; render(); window.scrollTo(0, 0); loadDay(reviewDate); });
   root.querySelectorAll('[data-hist]').forEach(b => b.onclick = () => { histDays = +b.dataset.hist; render(); });
