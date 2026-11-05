@@ -1328,6 +1328,14 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => { /* app works without it */ });
 }
 render();
+// Home-screen shortcuts (press and hold the app icon): ?new=task and ?new=event open the matching sheet straight away.
+{
+  const q = new URLSearchParams(location.search).get('new');
+  if (q === 'task' || q === 'event') {
+    history.replaceState(null, '', location.pathname + '?source=pwa'); // a refresh must not open it again
+    setTimeout(() => { if (q === 'task') openAddTask(); else openEventForm({ date: today() }); }, 0);
+  }
+}
 if (connected()) {
   loadDay(viewDate); loadInbox(); loadPrices();
   if (!Object.keys(S.health).length) syncHealth(30); else if (Date.now() - S.healthAt > 30 * 60 * 1000) syncHealth(7);

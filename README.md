@@ -63,6 +63,7 @@ It has no server of its own. It talks to the **Worker from the Calorie tracker r
 - **Portfolio:** tap a coin to change the amount or remove it. If a price looks wrong, it is probably the wrong coin for that ticker: remove it and add the right one. Your amounts are in the backup file too, so keep that file private.
 - **Inbox filters:** All, From CRM, Starred, Last 2 days. **Tap a mail** to read it right there (quoted history is cut, long mails are shortened, attachments are listed). **Open in Gmail** is one tap away. Reading in My Day does not mark the mail as read in Gmail, and the text is not saved on your phone.
 - **Review:** the date defaults to yesterday before noon. Everything saves as you type. "Add meetings and tasks to my notes" pastes that day's meetings and completed tasks into your text.
+- **Home-screen shortcuts:** press and hold the My Day icon on the phone for **New task** and **New event**; each opens its form straight away. (Android updates an installed app's shortcuts when it next checks for changes, which can take a day; reinstalling the app makes it immediate.)
 - **Settings → Theme:** Dark (default), Light, or Match phone. **Export backup** saves reviews and prep notes; do this before changing the app's web address.
 
 ## Not yet verified
