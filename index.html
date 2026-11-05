@@ -212,6 +212,10 @@ const BUILD = '2026-11-03.3';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
+// Other apps. On Android an intent link asks the phone to open the app itself (the installed Pocket CRM, the LinkedIn app) and falls back to the web page when it is not installed.
+const POCKET_CRM_URL = 'https://contact-capture.matthias-homan.workers.dev/';
+const LINKEDIN_URL = 'https://www.linkedin.com/feed/';
+const intentLink = (url, pkg) => { const u = new URL(url); return `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=${u.protocol.replace(':', '')};action=android.intent.action.VIEW;${pkg ? `package=${pkg};` : ''}S.browser_fallback_url=${encodeURIComponent(url)};end`; };
 const MOODS = [['😞', 'Rough'], ['🙁', 'Meh'], ['😐', 'Okay'], ['🙂', 'Good'], ['😄', 'Great']];
 const BASE_TAGS = ['Work', 'Social', 'Family', 'Errands', 'Learning', 'Rest', 'Travel', 'Outdoors', 'Creative'];
 const SPORT_TAGS = ['Run', 'Gym', 'Golf 9', 'Golf 18', 'Golf Indoor', 'Tennis', 'Padel'];
@@ -611,6 +615,8 @@ function moreHtml() {
     <button class="menu" data-act="new-note-now"><i>＋</i><span>New meeting note<small>Creates it in your Notion Meetings database and opens it</small></span></button>
     <a class="menu" href="${MEETINGS_DB_URL}" target="_blank" rel="noopener"><i>▤</i><span>Meetings database<small>Open in Notion</small></span></a>
     <a class="menu" href="${TASKS_DB_URL}" target="_blank" rel="noopener"><i>☑</i><span>Task database<small>Open in Notion</small></span></a>
+    <a class="menu" href="${POCKET_CRM_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(POCKET_CRM_URL))}"><i>☎</i><span>Pocket CRM<small>Your contacts, people and next meetings</small></span></a>
+    <a class="menu" href="${LINKEDIN_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(LINKEDIN_URL, 'com.linkedin.android'))}"><i>in</i><span>LinkedIn<small>Opens the LinkedIn app</small></span></a>
     <button class="menu" data-act="to-portfolio"><i>◔</i><span>Portfolio<small>${portfolioSubtitle()}</small></span></button>
     <button class="menu" data-act="to-history"><i>↗</i><span>History<small>Mood over time and patterns</small></span></button>
     <button class="menu" data-act="to-settings"><i>⚙</i><span>Settings<small>Connection, theme, backup</small></span></button>`;
@@ -1153,6 +1159,11 @@ function bind(root) {
     openEventForm({ date: viewDate, startMin: min });
   };
 }
+// On Android, "open the app" links go through an intent so the phone starts the app instead of a browser tab.
+document.addEventListener('click', ev => {
+  const a = ev.target.closest && ev.target.closest('a[data-android]');
+  if (a && /Android/i.test(navigator.userAgent)) { ev.preventDefault(); location.href = a.dataset.android; }
+});
 async function act(a) {
   if (a === 'wprev') { viewDate = addDays(viewDate, -7); render(); loadDay(viewDate); }
   else if (a === 'wnext') { viewDate = addDays(viewDate, 7); render(); loadDay(viewDate); }
