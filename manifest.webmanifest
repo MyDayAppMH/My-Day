@@ -55,6 +55,19 @@
           "type": "image/png"
         }
       ]
+    },
+    {
+      "name": "Review",
+      "short_name": "Review",
+      "description": "Review your day",
+      "url": "./index.html?new=review",
+      "icons": [
+        {
+          "src": "icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     }
   ]
 }

@@ -1328,12 +1328,13 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => { /* app works without it */ });
 }
 render();
-// Home-screen shortcuts (press and hold the app icon): ?new=task and ?new=event open the matching sheet straight away.
+// Home-screen shortcuts (press and hold the app icon): ?new=task and ?new=event open the matching sheet straight away; ?new=review opens the Review tab.
 {
   const q = new URLSearchParams(location.search).get('new');
-  if (q === 'task' || q === 'event') {
+  if (q === 'task' || q === 'event' || q === 'review') {
     history.replaceState(null, '', location.pathname + '?source=pwa'); // a refresh must not open it again
-    setTimeout(() => { if (q === 'task') openAddTask(); else openEventForm({ date: today() }); }, 0);
+    if (q === 'review') { go('review'); }
+    else setTimeout(() => { if (q === 'task') openAddTask(); else openEventForm({ date: today() }); }, 0);
   }
 }
 if (connected()) {
