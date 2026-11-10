@@ -59,6 +59,15 @@ a { color: var(--ink); }
 .vit > div { flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
 .vit b { display: block; font-size: 20px; }
 .vit span { font-size: 12px; color: var(--muted); }
+.cnt { display: flex; gap: 8px; align-items: stretch; }
+.cnt .big { flex: 1; display: grid; grid-template-columns: 1fr auto; align-items: center; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; }
+.cnt .big b { font-size: 24px; }
+.cnt .big small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+.sm { min-width: 44px; height: 40px; border: 1px solid var(--line); background: var(--card); border-radius: 12px; font-size: 20px; font-weight: 600; }
+.sm:disabled { opacity: .35; }
+.drow { display: flex; align-items: center; gap: 10px; padding: 4px 2px; }
+.drow span { flex: 1; font-size: 15px; }
+.drow b { min-width: 24px; text-align: center; font-size: 18px; }
 .tick { display: flex; align-items: center; gap: 10px; padding: 8px 2px; font-size: 15px; }
 .tick input { width: 22px; height: 22px; accent-color: var(--acc); }
 .health { margin: 0 2px 8px; font-size: 13px; color: var(--muted); }
@@ -225,6 +234,10 @@ const RANKINGS_URL = 'https://matthias-sport.github.io/racket-rankings-app/';
 const RANKINGS_PACKAGE = 'org.chromium.webapk.a0d7a67882b031cc1_v2'; // the installed Racket Rankings app (chrome://webapks lists it)
 const POCKET_CRM_PACKAGE = 'org.chromium.webapk.a5bf4b8d4443f6622_v2'; // the installed Pocket CRM app (Chrome's chrome://webapks lists it)
 const intentLink = (url, pkg) => { const u = new URL(url); return `intent://${u.host}${u.pathname}${u.search}${u.hash}#Intent;scheme=${u.protocol.replace(':', '')};action=android.intent.action.VIEW;${pkg ? `package=${pkg};` : ''}S.browser_fallback_url=${encodeURIComponent(url)};end`; };
+const DRINKS = [['beer', 'Beer'], ['wine', 'Wine'], ['long', 'Long drink'], ['shot', 'Shot']];
+const GLASS_ML = 250; // one tap on Water is one glass
+const drinkTotal = r => DRINKS.reduce((n, [k]) => n + ((r.drinks || {})[k] || 0), 0);
+const drank = r => !!(r && (r.alcohol || drinkTotal(r) > 0));
 const MOODS = [['😞', 'Rough'], ['🙁', 'Meh'], ['😐', 'Okay'], ['🙂', 'Good'], ['😄', 'Great']];
 const BASE_TAGS = ['Work', 'Social', 'Family', 'Errands', 'Learning', 'Rest', 'Travel', 'Outdoors', 'Creative'];
 const SPORT_TAGS = ['Run', 'Walk', 'Gym', 'Golf 9', 'Golf 18', 'Golf Indoor', 'Tennis', 'Padel'];
@@ -510,7 +523,7 @@ function dayHtml() {
     ${weekHtml(d)}
     <div class="stack">
     ${needReview ? `<div class="nudge"><span><b>How was yesterday?</b><span class="muted" style="font-size:14px">30 seconds to log it.</span></span><button class="btn day" data-act="review-yesterday">Log it</button></div>` : ''}
-    ${isToday ? readinessCard(d) : ''}${isToday ? healthLine(d) : ''}${isToday ? portfolioLine() : ''}
+    ${isToday ? readinessCard(d) : ''}${isToday ? healthLine(d) : ''}${isToday ? `<div class="card track">${trackHtml(d, false)}</div>` : ''}${isToday ? portfolioLine() : ''}
     ${allDay.length ? `<div class="allday">${allDay.map(e => `<span>${esc(e.title)}</span>`).join('')}</div>` : ''}
     ${trayHtml(d, b)}
     ${sh ? `<p class="shape"><b>${sh.count} meeting${sh.count > 1 ? 's' : ''}</b> · ${dur(sh.mins)} booked${sh.free ? ` · longest free block <b>${timeStr(sh.free[0])}–${timeStr(sh.free[1])}</b>` : ''}</p>` : ''}
@@ -555,17 +568,18 @@ function readiness(date) {
   // An average night with average vitals lands around 7. With only sleep to go on, it cannot claim more than 7.
   let raw = 1 + 9 * clamp((base - 10) / 90, 0, 1);
   if (parts.length < 3) raw = Math.min(raw, 7);
-  const capped = flags.length > 0 && raw > 5;
+  const ill = !!(S.reviews[date] || {}).ill; // you said you are ill or injured
+  const capped = (flags.length > 0 || ill) && raw > 5;
   const score = clamp(Math.round(capped ? 5 : raw), 1, 10);
   const label = score >= 8 ? 'Good to go hard' : score >= 6 ? 'Normal training' : score >= 4 ? 'Keep it light' : 'Rest or recover';
   const missing = [!parts.some(p => p.k === 'hrv') && 'HRV', !parts.some(p => p.k === 'rhr') && 'resting heart rate', !parts.some(p => p.k === 'load') && 'training load'].filter(Boolean);
-  return { score, label, parts, flags, capped, missing, base: Math.round(base), learning: Math.min(bHrv.n, bRhr.n) };
+  return { score, label, parts, flags, ill, capped, missing, base: Math.round(base), learning: Math.min(bHrv.n, bRhr.n) };
 }
 function readinessColor(sc) { return sc >= 8 ? 'var(--good)' : sc >= 6 ? 'var(--ink)' : sc >= 4 ? 'var(--warn)' : 'var(--danger)'; }
 function readinessCard(date) {
   const r = readiness(date);
   if (r.pending) return `<div class="rd" style="cursor:default"><span class="n muted">–<small>/10</small></span><span class="t"><b>Readiness for training</b><span>Waiting for last night's sleep data. Refresh after your watch has synced.</span></span></div>`;
-  const note = r.flags.length ? `Body signals look off: ${r.flags[0]}.` : r.missing.length ? `Based on ${r.parts.map(p => p.name.toLowerCase()).join(' and ')}.` : 'Sleep, HRV, resting heart rate and recent load.';
+  const note = r.ill ? 'You marked yourself ill or injured, so it is held at 5.' : r.flags.length ? `Body signals look off: ${r.flags[0]}.` : r.missing.length ? `Based on ${r.parts.map(p => p.name.toLowerCase()).join(' and ')}.` : 'Sleep, HRV, resting heart rate and recent load.';
   return `<button class="rd" data-act="readiness"><span class="n" style="color:${readinessColor(r.score)}">${r.score}<small>/10</small></span><span class="t"><b>${r.label}</b><span>${esc(note)}</span></span></button>`;
 }
 function openReadiness() {
@@ -573,6 +587,7 @@ function openReadiness() {
   if (r.pending) return openSheet(`<h2>Readiness for training</h2><p class="muted">There is no sleep figure for ${esc(dayLabel(viewDate).toLowerCase())} yet. It appears once your watch has synced last night's sleep.</p><div class="row" style="margin-top:14px"><button class="btn day" id="rdOk">Close</button></div>`) || ($('rdOk').onclick = closeSheet);
   openSheet(`<h2><span style="color:${readinessColor(r.score)}">${r.score}/10</span> · ${r.label}</h2>
     <p class="muted" style="margin:2px 0 8px">${esc(longDate(viewDate))}. Each part is scored against your own normal over the last 28 days.</p>
+    ${r.ill ? `<div class="errbox">You marked ${esc(dayLabel(viewDate).toLowerCase())} as ill or injured, so the score is held at 5. Untick it on the day screen if that changes.</div>` : ''}
     ${r.flags.length ? `<div class="errbox">${r.capped ? 'The score is held at 5 because ' : 'Worth watching: '}${esc(r.flags.join(', '))}. These can come before an illness. Treat today as a lighter day.</div>` : ''}
     ${r.parts.map(p => `<div style="margin-top:12px"><div style="display:flex;justify-content:space-between;gap:8px"><b style="font-weight:600">${esc(p.name)}</b><span class="muted num">${Math.round(p.pts)} of 100 · ${Math.round(p.w / r.parts.reduce((a, q) => a + q.w, 0) * 100)}% of the score</span></div><div class="bar2"><i style="width:${Math.round(p.pts)}%"></i></div><div class="muted" style="font-size:13px;margin-top:3px">${esc(p.text)}. ${esc(p.hint)}</div></div>`).join('')}
     ${r.missing.length ? `<p class="muted" style="font-size:13px;margin-top:14px">Not included yet: ${esc(r.missing.join(', '))}${r.learning < 7 ? `. Your baseline needs at least 7 days of data (you have ${r.learning}).` : '. No figure for it today.'}</p>` : ''}
@@ -641,18 +656,21 @@ function insightHtml(days) {
   const lines = [
     cmp('Sleep 7h or more', withSleep.filter(x => x.h.sleepMinutes >= 420), withSleep.filter(x => x.h.sleepMinutes < 420), '7h+ of sleep', 'less sleep'),
     cmp('Days with sport', rows.filter(x => isSport(x.r)), rows.filter(x => !isSport(x.r)), 'sport', 'no sport'),
-    cmp('Days with alcohol', rows.filter(x => x.r.alcohol), rows.filter(x => !x.r.alcohol), 'alcohol', 'no alcohol'),
+    cmp('Days with alcohol', rows.filter(x => drank(x.r)), rows.filter(x => !drank(x.r)), 'alcohol', 'no alcohol'),
+    cmp('Days with 6+ glasses of water', rows.filter(x => (x.r.water || 0) >= 6), rows.filter(x => (x.r.water || 0) < 6), '6+ glasses', 'less water'),
+    cmp('Travel days', rows.filter(x => x.r.travel), rows.filter(x => !x.r.travel), 'travelling', 'at home'),
+    cmp('Days ill or injured', rows.filter(x => x.r.ill), rows.filter(x => !x.r.ill), 'ill or injured', 'well'),
     cmp('Days with sex', rows.filter(x => x.r.sex), rows.filter(x => !x.r.sex), 'sex', 'none'),
     cmp('Days with 8,000+ steps', rows.filter(x => x.h && x.h.steps >= 8000), rows.filter(x => x.h && x.h.steps != null && x.h.steps < 8000), '8,000+ steps', 'fewer steps'),
   ].filter(Boolean);
-  return `<div class="card"><h3>Patterns</h3>${lines.length ? `<div class="kv num">${lines.join('')}</div>` : `<p class="empty">Patterns show up once you have at least four logged days on each side of a comparison (sleep, sport, steps, alcohol). You have ${rows.length} mood entries in this period.</p>`}
+  return `<div class="card"><h3>Patterns</h3>${lines.length ? `<div class="kv num">${lines.join('')}</div>` : `<p class="empty">Patterns show up once you have at least four logged days on each side of a comparison (sleep, sport, steps, alcohol, water). You have ${rows.length} mood entries in this period.</p>`}
     <p class="muted" style="font-size:12px;margin:10px 0 0">These are averages of your own entries, not proof that one thing causes the other.</p></div>`;
 }
 function sportHtml(days) {
   const counts = {};
   for (const d of days) for (const t of (S.reviews[d] || {}).tags || []) if (SPORT_TAGS.includes(t)) counts[t] = (counts[t] || 0) + 1;
   const total = days.filter(d => S.reviews[d] && isSport(S.reviews[d])).length;
-  return `<div class="card"><h3>Sport</h3>${total ? `<div class="kv num">${SPORT_TAGS.filter(t => counts[t]).map(t => `<span class="k">${esc(t)}</span><b>${counts[t]}×</b>`).join('')}<span class="k">Days with sport</span><b>${total} of ${days.length}</b></div>` : '<p class="empty">Tag a day with Run, Gym, Golf, Tennis or Padel in the Review and it shows up here.</p>'}</div>`;
+  return `<div class="card"><h3>Sport</h3>${total ? `<div class="kv num">${SPORT_TAGS.filter(t => counts[t]).map(t => `<span class="k">${esc(t)}</span><b>${counts[t]}×</b>`).join('')}<span class="k">Days with sport</span><b>${total} of ${days.length}</b></div>` : '<p class="empty">Tag a day with Run, Walk, Gym, Golf, Tennis or Padel in the Review and it shows up here.</p>'}</div>`;
 }
 function moodChart(days) {
   const W = 340, H = 110, padL = 22, padB = 16, padT = 8, pw = W - padL - 6, ph = H - padB - padT;
@@ -671,7 +689,7 @@ function historyHtml() {
   const logged = days.filter(d => S.reviews[d]);
   const list = [...logged].reverse().map(d => {
     const r = S.reviews[d], h = S.health[d] || {};
-    const sub = [(r.tags || []).join(', '), r.energy ? `energy ${r.energy}/5` : '', h.sleepMinutes != null ? `slept ${dur(h.sleepMinutes)}` : '', h.steps != null ? `${fmt(h.steps)} steps` : ''].filter(Boolean).join(' · ');
+    const sub = [(r.tags || []).join(', '), r.energy ? `energy ${r.energy}/5` : '', h.sleepMinutes != null ? `slept ${dur(h.sleepMinutes)}` : '', h.steps != null ? `${fmt(h.steps)} steps` : '', drinkTotal(r) ? `${drinkTotal(r)} drink${drinkTotal(r) === 1 ? '' : 's'}` : '', r.water ? `${litres(r.water)} L water` : '', r.travel ? 'travelling' : '', r.ill ? 'ill or injured' : ''].filter(Boolean).join(' · ');
     const text = (r.win || r.did || '').split('\n')[0];
     return `<button class="hrow" data-rev="${d}"><span class="em">${r.mood ? MOODS[r.mood - 1][0] : '•'}</span><span><span class="hd2">${shortDate(d)}</span><span class="sub">${esc(sub)}</span>${text ? `<span class="sub" style="color:var(--ink)">${esc(text.slice(0, 120))}</span>` : ''}</span></button>`;
   }).join('');
@@ -713,9 +731,8 @@ function reviewHtml() {
       <div class="chips">${SPORT_TAGS.map(t => `<button class="chip ${(r.tags || []).includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}</div>
       <span class="lbl2">What was it about?</span>
       <div class="chips">${tags.map(t => `<button class="chip ${(r.tags || []).includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}<button class="chip" data-act="new-tag">+ tag</button></div>
-      <span class="lbl2">Also</span>
-      <label class="tick"><input type="checkbox" data-flag="alcohol" ${r.alcohol ? 'checked' : ''}> Had alcohol</label>
-      <label class="tick"><input type="checkbox" data-flag="sex" ${r.sex ? 'checked' : ''}> Had sex</label>
+      <span class="lbl2">Water, alcohol and other</span>
+      ${trackHtml(reviewDate, true)}
       <span class="lbl2">What happened</span>
       <textarea class="field" id="did" style="margin-top:0" placeholder="Meetings, workout, who you saw, anything worth remembering">${esc(r.did || '')}</textarea>
       <span class="lbl2">Best moment or one win</span>
@@ -725,18 +742,40 @@ function reviewHtml() {
     ${r.updatedAt ? `<button class="btn" data-act="clear-review">Clear this day's review</button>` : ''}</div>`;
 }
 let saveTimer;
-function patchReview(patch) {
-  const r = S.reviews[reviewDate] || (S.reviews[reviewDate] = {});
+// One entry per day holds the review and the quick counters, so the day screen and the Review tab always agree.
+function patchDay(date, patch) {
+  const r = S.reviews[date] || (S.reviews[date] = {});
   Object.assign(r, patch, { updatedAt: Date.now() });
-  const empty = !r.mood && !r.energy && !r.alcohol && !r.sex && !(r.tags || []).length && !(r.did || '').trim() && !(r.win || '').trim();
-  if (empty) delete S.reviews[reviewDate];
+  const empty = !r.mood && !r.energy && !r.alcohol && !r.sex && !r.travel && !r.ill && !r.water && !drinkTotal(r) && !(r.tags || []).length && !(r.did || '').trim() && !(r.win || '').trim();
+  if (empty) delete S.reviews[date];
   save();
+}
+function patchReview(patch) {
+  patchDay(reviewDate, patch);
   const el = $('saved'); if (el) el.textContent = 'Saved ✓';
+}
+function bump(date, key, by) {
+  const r = S.reviews[date] || {};
+  if (key === 'water') return patchDay(date, { water: Math.max(0, (r.water || 0) + by) });
+  patchDay(date, { drinks: { ...(r.drinks || {}), [key]: Math.max(0, ((r.drinks || {})[key] || 0) + by) }, alcohol: true });
+}
+function setFlag(date, key, on) {
+  const r = S.reviews[date] || {};
+  if (key === 'alcohol' && !on && drinkTotal(r) > 0) { if (!confirm('Switch off alcohol and clear the drinks you counted?')) return false; return patchDay(date, { alcohol: false, drinks: {} }); }
+  patchDay(date, { [key]: on });
+}
+const litres = n => (n * GLASS_ML / 1000).toFixed(2).replace(/\.?0+$/, '');
+/** Water counter, drink counters (only while "drinking alcohol" is ticked), travel and illness. Shared by the day screen and Review. */
+function trackHtml(date, withSex) {
+  const r = S.reviews[date] || {}, w = r.water || 0, tick = (k, label) => `<label class="tick"><input type="checkbox" data-flag="${k}" data-date="${date}" ${r[k] ? 'checked' : ''}> ${label}</label>`;
+  return `<div class="cnt"><button class="big" data-cnt data-date="${date}" data-key="water" data-by="1" aria-label="Add a glass of water"><span>💧 Water</span><b class="num">${w}</b><small>${w ? `${w === 1 ? 'glass' : 'glasses'} · ${litres(w)} L` : 'tap to add a glass'}</small></button>${w ? `<button class="sm" data-cnt data-date="${date}" data-key="water" data-by="-1" aria-label="Remove a glass">−</button>` : ''}</div>
+    ${tick('alcohol', 'Drinking alcohol')}
+    ${drank(r) ? DRINKS.map(([k, l]) => { const n = (r.drinks || {})[k] || 0; return `<div class="drow"><span>${l}</span><button class="sm" data-cnt data-date="${date}" data-key="${k}" data-by="-1" ${n ? '' : 'disabled'} aria-label="One less ${l}">−</button><b class="num">${n}</b><button class="sm" data-cnt data-date="${date}" data-key="${k}" data-by="1" aria-label="One more ${l}">+</button></div>`; }).join('') + `<div class="muted" style="font-size:12px;margin:2px 2px 6px">${drinkTotal(r)} drink${drinkTotal(r) === 1 ? '' : 's'} in total</div>` : ''}
+    ${tick('travel', 'Travelling')}${tick('ill', 'Ill or injured')}${withSex ? tick('sex', 'Had sex') : ''}`;
 }
 function bindReview(root) {
   root.querySelectorAll('[data-mood]').forEach(b => b.onclick = () => { const v = +b.dataset.mood, cur = (S.reviews[reviewDate] || {}).mood; patchReview({ mood: cur === v ? null : v }); render(); });
   root.querySelectorAll('[data-energy]').forEach(b => b.onclick = () => { const v = +b.dataset.energy, cur = (S.reviews[reviewDate] || {}).energy; patchReview({ energy: cur === v ? null : v }); render(); });
-  root.querySelectorAll('[data-flag]').forEach(b => b.onchange = () => { patchReview({ [b.dataset.flag]: b.checked }); render(); });
   root.querySelectorAll('[data-tag]').forEach(b => b.onclick = () => {
     const t = b.dataset.tag, cur = (S.reviews[reviewDate] || {}).tags || [];
     patchReview({ tags: cur.includes(t) ? cur.filter(x => x !== t) : [...cur, t] }); render();
@@ -1154,6 +1193,8 @@ function bind(root) {
   root.querySelectorAll('[data-done]').forEach(b => b.onclick = () => toggleTask(b.dataset.done));
   root.querySelectorAll('[data-task]').forEach(b => b.onclick = () => openTask(b.dataset.task));
   root.querySelectorAll('[data-hold]').forEach(b => b.onclick = () => openHolding(+b.dataset.hold));
+  root.querySelectorAll('[data-cnt]').forEach(b => b.onclick = () => { bump(b.dataset.date, b.dataset.key, +b.dataset.by); render(); });
+  root.querySelectorAll('[data-flag]').forEach(b => b.onchange = () => { setFlag(b.dataset.date, b.dataset.flag, b.checked); render(); });
   root.querySelectorAll('[data-day]').forEach(b => b.onclick = () => { viewDate = b.dataset.day; render(); loadDay(viewDate); });
   root.querySelectorAll('[data-mf]').forEach(b => b.onclick = () => { mailFilter = b.dataset.mf; render(); });
   root.querySelectorAll('[data-mopen]').forEach(b => b.onclick = () => toggleMail(b.dataset.mopen));
