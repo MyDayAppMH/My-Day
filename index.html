@@ -61,8 +61,6 @@ a { color: var(--ink); }
 .vit span { font-size: 12px; color: var(--muted); }
 .tick { display: flex; align-items: center; gap: 10px; padding: 8px 2px; font-size: 15px; }
 .tick input { width: 22px; height: 22px; accent-color: var(--acc); }
-.mini { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 8px; }
-.mini a { flex: 0 1 auto; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; font-weight: 600; text-decoration: none; color: var(--ink); }
 .health { margin: 0 2px 8px; font-size: 13px; color: var(--muted); }
 .allday { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
 .allday span { background: var(--soft); border-radius: 8px; padding: 4px 10px; font-size: 13px; }
@@ -224,7 +222,7 @@ const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
 const POCKET_CRM_URL = 'https://contact-capture.matthias-homan.workers.dev/';
 const LINKEDIN_URL = 'https://www.linkedin.com/feed/';
 const RANKINGS_URL = 'https://matthias-sport.github.io/racket-rankings-app/';
-const RANKINGS_PACKAGE = ''; // the installed Rankings app's package name (chrome://webapks lists it); empty = opens in Chrome
+const RANKINGS_PACKAGE = 'org.chromium.webapk.a0d7a67882b031cc1_v2'; // the installed Racket Rankings app (chrome://webapks lists it)
 const POCKET_CRM_PACKAGE = 'org.chromium.webapk.a5bf4b8d4443f6622_v2'; // the installed Pocket CRM app (Chrome's chrome://webapks lists it)
 const intentLink = (url, pkg) => { const u = new URL(url); return `intent://${u.host}${u.pathname}${u.search}${u.hash}#Intent;scheme=${u.protocol.replace(':', '')};action=android.intent.action.VIEW;${pkg ? `package=${pkg};` : ''}S.browser_fallback_url=${encodeURIComponent(url)};end`; };
 const MOODS = [['😞', 'Rough'], ['🙁', 'Meh'], ['😐', 'Okay'], ['🙂', 'Good'], ['😄', 'Great']];
@@ -629,8 +627,7 @@ function moreHtml() {
     <a class="menu" href="${TASKS_DB_URL}" target="_blank" rel="noopener"><i>☑</i><span>Task database<small>Open in Notion</small></span></a>
     <a class="menu" href="${POCKET_CRM_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(POCKET_CRM_URL, POCKET_CRM_PACKAGE))}"><i>☎</i><span>Pocket CRM<small>Your contacts, people and next meetings</small></span></a>
     <a class="menu" href="${LINKEDIN_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(LINKEDIN_URL, 'com.linkedin.android'))}"><i>in</i><span>LinkedIn<small>Opens the LinkedIn app</small></span></a>
-    <span class="lbl2">Racket Rankings</span>
-    <div class="mini">${[['Overview', ''], ['Matches', '#/matches'], ['Opponents', '#/opponents'], ['Rankings', '#/rankings']].map(([t, h]) => `<a href="${RANKINGS_URL}${h}" target="_blank" rel="noopener" data-android="${esc(intentLink(RANKINGS_URL + h, RANKINGS_PACKAGE))}">${t}</a>`).join('')}</div>
+    <a class="menu" href="${RANKINGS_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(RANKINGS_URL, RANKINGS_PACKAGE))}"><i>🎾</i><span>Racket Rankings<small>Your tennis and padel results and rankings</small></span></a>
     <button class="menu" data-act="to-portfolio"><i>◔</i><span>Portfolio<small>${portfolioSubtitle()}</small></span></button>
     <button class="menu" data-act="to-history"><i>↗</i><span>History<small>Mood over time and patterns</small></span></button>
     <button class="menu" data-act="to-settings"><i>⚙</i><span>Settings<small>Connection, theme, backup</small></span></button>`;
