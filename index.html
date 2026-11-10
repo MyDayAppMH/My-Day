@@ -227,7 +227,7 @@ svg text { fill: var(--muted); font-size: 10px; font-family: inherit; }
 
 <script>
 'use strict';
-const BUILD = '2026-11-03.3';
+const BUILD = '2026-11-10.1';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -304,6 +304,12 @@ function rollDay() {
   if (t === lastToday) return false;
   if (viewDate === lastToday) { viewDate = t; didScroll = false; }
   lastToday = t; return true;
+}
+let sbMsg = null, sbList = null;
+async function sbRefresh(quiet) {
+  if (!SharedBackup.configured()) { sbList = null; return; }
+  try { sbList = await SharedBackup.list(); if (!quiet) sbMsg = { ok: true, text: 'Connected.' }; } catch (e) { sbList = null; sbMsg = { ok: false, text: e.message }; }
+  if (view === 'settings') render();
 }
 let histDays = 30, mailFilter = 'all', loading = false, didScroll = false;
 
@@ -966,6 +972,16 @@ function settingsHtml() {
     <div class="card"><h3>Your tags</h3>
       <p class="muted">Quick tags in the Review. Add your own from the Review tab; tap one of yours here to remove it.</p>
       <div class="chips">${[...SPORT_TAGS, ...BASE_TAGS].map(t => `<span class="chip">${esc(t)}</span>`).join('')}${S.tags.map(t => `<button class="chip on" data-tagdel="${esc(t)}">${esc(t)} ✕</button>`).join('')}</div></div>
+    <div class="card"><h3>Shared backup (Notion)</h3>
+      <p class="muted">Saves My Day, and your other apps, into the Notion database <b>App backups</b> through your Pocket CRM service. It backs up by itself once a day when you open the app.</p>
+      <label class="lbl2" for="sbUrl">Pocket CRM address</label>
+      <input class="field" style="margin-top:0" id="sbUrl" inputmode="url" autocapitalize="off" value="${esc(SharedBackup.url())}">
+      <label class="lbl2" for="sbTok">Pocket CRM access token</label>
+      <input class="field" style="margin-top:0" id="sbTok" type="password" autocomplete="off" value="${esc(SharedBackup.token())}" placeholder="the same token as in Pocket CRM">
+      <label class="tick"><input type="checkbox" id="sbHold" ${S.settings.backupHoldings ? 'checked' : ''}> Include my portfolio amounts</label>
+      <div class="row" style="margin-top:8px;flex-wrap:wrap"><button class="btn day" data-act="sb-save">Back up now</button><button class="btn" data-act="sb-restore">Restore My Day</button><button class="btn" data-act="sb-refresh">Check</button></div>
+      ${sbMsg ? `<div class="${sbMsg.ok ? 'okbox' : 'errbox'}" style="margin-top:10px">${esc(sbMsg.text)}</div>` : ''}
+      ${SharedBackup.configured() ? `<div class="kv" style="margin-top:10px">${Object.entries(SharedBackup.NAMES).map(([k, n]) => { const b = (sbList || []).find(x => x.app === k); const old = b && Date.now() - new Date(b.at).getTime() > 7 * 864e5; return `<span class="k">${n}</span><span style="${old || !b ? 'color:var(--warn)' : ''}">${sbList ? (b ? `${esc(SharedBackup.ago(b.at))} · ${b.size_kb} KB${b.device ? ' · ' + esc(b.device) : ''}` : 'no backup yet') : '…'}</span>`; }).join('')}</div><p class="muted" style="font-size:12px;margin:8px 0 0">Racket Rankings and Pocket CRM back themselves up from their own Settings or Data page. Restoring only adds what is missing or newer here; it never deletes.</p>` : ''}</div>
     <div class="card"><h3>Your data</h3>
       <p class="muted">Reviews and prep notes live on this device only. Export a backup now and then.</p>
       <div class="row" style="flex-wrap:wrap"><button class="btn" data-act="export">Export backup</button><button class="btn" data-act="import">Import backup</button>
@@ -1240,7 +1256,7 @@ async function act(a) {
   else if (a === 'rprev') { reviewDate = addDays(reviewDate, -1); render(); loadDay(reviewDate); }
   else if (a === 'rnext') { reviewDate = addDays(reviewDate, 1); render(); loadDay(reviewDate); }
   else if (a === 'refresh') { loadDay(viewDate); loadInbox(); }
-  else if (a === 'goto-settings' || a === 'to-settings') { view = 'settings'; render(); window.scrollTo(0, 0); }
+  else if (a === 'goto-settings' || a === 'to-settings') { view = 'settings'; sbMsg = null; render(); window.scrollTo(0, 0); sbRefresh(true); }
   else if (a === 'to-more') { view = 'more'; render(); window.scrollTo(0, 0); }
   else if (a === 'to-history') { view = 'history'; render(); window.scrollTo(0, 0); }
   else if (a === 'to-portfolio') { view = 'portfolio'; render(); window.scrollTo(0, 0); loadPrices(); }
@@ -1290,6 +1306,21 @@ async function act(a) {
     } catch (e) { out.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; }
   }
   else if (a === 'sync-all') { saveConn(); await syncHealth(30); loadInbox(); loadDay(view === 'review' ? reviewDate : viewDate); }
+  else if (a === 'sb-save' || a === 'sb-refresh') {
+    SharedBackup.setup($('sbUrl').value, $('sbTok').value); S.settings.backupHoldings = $('sbHold').checked; save();
+    if (!SharedBackup.configured()) { sbMsg = { ok: false, text: 'Enter the Pocket CRM access token first.' }; return render(); }
+    if (a === 'sb-refresh') { sbMsg = { ok: true, text: 'Checking…' }; render(); return sbRefresh(); }
+    sbMsg = { ok: true, text: 'Backing up…' }; render();
+    try { const b = await SharedBackup.save('myday', backupObject(!!S.settings.backupHoldings)); sbMsg = { ok: true, text: `Backed up (${b.size_kb} KB).` }; } catch (e) { sbMsg = { ok: false, text: e.message }; }
+    render(); sbRefresh(true);
+  }
+  else if (a === 'sb-restore') {
+    SharedBackup.setup($('sbUrl').value, $('sbTok').value);
+    if (!confirm('Add the latest My Day backup from Notion to this phone? Days that are newer here stay as they are; nothing is deleted.')) return;
+    sbMsg = { ok: true, text: 'Restoring…' }; render();
+    try { const r = await SharedBackup.load('myday'); const n = mergeBackup(r.object); sbMsg = { ok: true, text: `Restored ${n} day${n === 1 ? '' : 's'} from the backup of ${new Date(r.at).toLocaleString()}.` }; } catch (e) { sbMsg = { ok: false, text: e.message }; }
+    render();
+  }
   else if (a === 'export') exportData();
   else if (a === 'import') $('importFile').click();
   else if (a === 'demo-on') { loadDemo(); render(); toast('Demo data loaded'); }
@@ -1310,8 +1341,81 @@ function toast(msg, label, fn) {
 }
 
 /* ---------- backup / demo / refresh ---------- */
+/* Shared backup client. The same code runs in My Day, Racket Rankings and Pocket CRM. Each app compresses its own data and
+   sends it to the Pocket CRM service, which keeps it in the Notion database "App backups". */
+const SharedBackup = (() => {
+  const DEFAULT_URL = 'https://contact-capture.matthias-homan.workers.dev';
+  const K = { url: 'sb.url', tok: 'sb.token', auto: 'sb.autoAt', last: 'sb.lastOk' };
+  const get = (k, d = '') => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
+  const set = (k, v) => { try { localStorage.setItem(k, v); } catch { /* storage off */ } };
+  const NAMES = { myday: 'My Day', rankings: 'Racket Rankings', crm: 'Pocket CRM' };
+  const b64 = (buf) => { let s = ''; const u = new Uint8Array(buf); for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
+  const unb64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  const pipe = async (bytes, stream) => new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
+  const api = {
+    NAMES,
+    url: () => (get(K.url) || DEFAULT_URL).replace(/\/+$/, ''),
+    token: () => get(K.tok),
+    configured: () => !!get(K.tok),
+    setup(url, token) { set(K.url, (url || '').trim()); set(K.tok, (token || '').trim()); },
+    lastOk: () => Number(get(K.last, '0')) || 0,
+    device() { const m = /Android[^;)]*;\s*([^;)]+?)(?:\sBuild|\))/.exec(navigator.userAgent); return m && m[1] && m[1] !== 'K' ? m[1] : /Android/.test(navigator.userAgent) ? 'Android phone' : 'Browser'; },
+    /** object -> "gz:<base64>" (or "raw:" when the browser cannot compress). */
+    async pack(obj) {
+      const bytes = new TextEncoder().encode(JSON.stringify(obj));
+      if (typeof CompressionStream === 'function') return 'gz:' + b64(await pipe(bytes, new CompressionStream('gzip')));
+      return 'raw:' + b64(bytes);
+    },
+    async unpack(str) {
+      const raw = unb64(str.slice(str.indexOf(':') + 1));
+      const bytes = str.startsWith('gz:') ? await pipe(raw, new DecompressionStream('gzip')) : raw;
+      return JSON.parse(new TextDecoder().decode(bytes));
+    },
+    async call(path, init = {}) {
+      let res;
+      try { res = await fetch(api.url() + path, { ...init, headers: { Authorization: 'Bearer ' + api.token(), ...(init.body ? { 'Content-Type': 'application/json' } : {}) }, signal: AbortSignal.timeout(45000) }); }
+      catch { throw new Error('Could not reach the Pocket CRM service. Check the signal and the address.'); }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(res.status === 401 ? 'The access token is wrong. Use the same token as Pocket CRM.' : data.error || `The service said no (${res.status}).`);
+      return data;
+    },
+    async save(app, obj) {
+      const data = await api.pack(obj);
+      const res = await api.call('/backup/save', { method: 'POST', body: JSON.stringify({ app, data, device: api.device() }) });
+      set(K.last, String(Date.now()));
+      return res.backup;
+    },
+    async load(app) { const r = await api.call('/backup/load?app=' + app); return { ...r, object: await api.unpack(r.data) }; },
+    async list() { return (await api.call('/backup/list')).backups; },
+    /** Once a day when the app is opened (and it has something to save). Silent: never throws. */
+    async auto(app, makeObject) {
+      if (!api.configured() || !navigator.onLine) return false;
+      if (Date.now() - (Number(get(K.auto, '0')) || 0) < 20 * 3600 * 1000) return false;
+      try { const o = makeObject(); if (!o) return false; set(K.auto, String(Date.now())); await api.save(app, o); return true; } catch { set(K.auto, '0'); return false; }
+    },
+    /** "3 hours ago" style label. */
+    ago(iso) { const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000); if (!(m >= 0)) return ''; if (m < 2) return 'just now'; if (m < 90) return m + ' minutes ago'; if (m < 36 * 60) return Math.round(m / 60) + ' hours ago'; return Math.round(m / 1440) + ' days ago'; },
+  };
+  return api;
+})();
+
+// What a backup holds: reviews and counters, prep notes, tags. Portfolio amounts only when asked for. Never the connection or keys.
+function backupObject(withHoldings = true) {
+  return { app: 'myday', version: 1, exportedAt: Date.now(), reviews: S.reviews, prep: S.prep, tags: S.tags, ...(withHoldings ? { holdings: S.crypto.holdings } : {}) };
+}
+/** Adds a backup to what is on the phone: a day is replaced only by a newer version of it, nothing is deleted. Returns the number of days taken over. */
+function mergeBackup(d) {
+  if (!d || d.app !== 'myday' || typeof d.reviews !== 'object') throw new Error('not a backup from this app');
+  let n = 0;
+  for (const [date, rv] of Object.entries(d.reviews)) { const mine = S.reviews[date]; if (!mine || (rv.updatedAt || 0) > (mine.updatedAt || 0)) { S.reviews[date] = rv; n++; } }
+  for (const [k, v] of Object.entries(d.prep || {})) if (!S.prep[k]) S.prep[k] = v;
+  for (const t of d.tags || []) if (!S.tags.includes(t)) S.tags.push(t);
+  for (const h of d.holdings || []) if (h && h.id && !S.crypto.holdings.some(x => x.id === h.id)) S.crypto.holdings.push(h);
+  save();
+  return n;
+}
 function exportData() {
-  const blob = new Blob([JSON.stringify({ app: 'myday', version: 1, exportedAt: Date.now(), reviews: S.reviews, prep: S.prep, tags: S.tags, holdings: S.crypto.holdings }, null, 1)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify(backupObject(), null, 1)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = `myday-backup-${today()}.json`;
   document.body.appendChild(a); a.click(); a.remove();
@@ -1322,14 +1426,8 @@ function importData(ev) {
   const r = new FileReader();
   r.onload = () => {
     try {
-      const d = JSON.parse(r.result);
-      if (d.app !== 'myday' || typeof d.reviews !== 'object') throw new Error('not a backup from this app');
-      let n = 0;
-      for (const [date, rv] of Object.entries(d.reviews)) { const mine = S.reviews[date]; if (!mine || (rv.updatedAt || 0) > (mine.updatedAt || 0)) { S.reviews[date] = rv; n++; } }
-      for (const [k, v] of Object.entries(d.prep || {})) if (!S.prep[k]) S.prep[k] = v;
-      for (const t of d.tags || []) if (!S.tags.includes(t)) S.tags.push(t);
-      for (const h of d.holdings || []) if (h && h.id && !S.crypto.holdings.some(x => x.id === h.id)) S.crypto.holdings.push(h);
-      save(); render(); toast(`Imported ${n} day${n === 1 ? '' : 's'}`);
+      const n = mergeBackup(JSON.parse(r.result));
+      render(); toast(`Imported ${n} day${n === 1 ? '' : 's'}`);
     } catch (e) { toast('Could not import: ' + e.message); }
   };
   r.readAsText(file);
@@ -1405,6 +1503,7 @@ render();
     else setTimeout(() => { if (q === 'task') openAddTask(); else openEventForm({ date: today() }); }, 0);
   }
 }
+SharedBackup.auto('myday', () => (Object.keys(S.reviews).length ? backupObject(!!S.settings.backupHoldings) : null));
 if (connected()) {
   loadDay(viewDate); loadInbox(); loadPrices();
   if (!Object.keys(S.health).length) syncHealth(30); else if (Date.now() - S.healthAt > 30 * 60 * 1000) syncHealth(7);
