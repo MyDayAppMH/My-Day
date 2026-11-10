@@ -55,6 +55,14 @@ a { color: var(--ink); }
 .wk .wd b { display: block; margin: 3px auto 0; font-weight: 400; font-size: 15px; color: var(--ink); width: 36px; height: 36px; line-height: 34px; border-radius: 50%; border: 1px solid transparent; }
 .wk .wd.today b { border-color: var(--muted); }
 .wk .wd.on b { background: var(--acc); color: var(--onacc); font-weight: 600; border-color: var(--acc); }
+.vit { display: flex; gap: 8px; }
+.vit > div { flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+.vit b { display: block; font-size: 20px; }
+.vit span { font-size: 12px; color: var(--muted); }
+.tick { display: flex; align-items: center; gap: 10px; padding: 8px 2px; font-size: 15px; }
+.tick input { width: 22px; height: 22px; accent-color: var(--acc); }
+.mini { display: flex; gap: 8px; flex-wrap: wrap; margin: 4px 0 8px; }
+.mini a { flex: 0 1 auto; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 16px; font-weight: 600; text-decoration: none; color: var(--ink); }
 .health { margin: 0 2px 8px; font-size: 13px; color: var(--muted); }
 .allday { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
 .allday span { background: var(--soft); border-radius: 8px; padding: 4px 10px; font-size: 13px; }
@@ -215,11 +223,13 @@ const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
 // Other apps. On Android an intent link asks the phone to open the app itself (the installed Pocket CRM, the LinkedIn app) and falls back to the web page when it is not installed.
 const POCKET_CRM_URL = 'https://contact-capture.matthias-homan.workers.dev/';
 const LINKEDIN_URL = 'https://www.linkedin.com/feed/';
+const RANKINGS_URL = 'https://matthias-sport.github.io/racket-rankings-app/';
+const RANKINGS_PACKAGE = ''; // the installed Rankings app's package name (chrome://webapks lists it); empty = opens in Chrome
 const POCKET_CRM_PACKAGE = 'org.chromium.webapk.a5bf4b8d4443f6622_v2'; // the installed Pocket CRM app (Chrome's chrome://webapks lists it)
-const intentLink = (url, pkg) => { const u = new URL(url); return `intent://${u.host}${u.pathname}${u.search}#Intent;scheme=${u.protocol.replace(':', '')};action=android.intent.action.VIEW;${pkg ? `package=${pkg};` : ''}S.browser_fallback_url=${encodeURIComponent(url)};end`; };
+const intentLink = (url, pkg) => { const u = new URL(url); return `intent://${u.host}${u.pathname}${u.search}${u.hash}#Intent;scheme=${u.protocol.replace(':', '')};action=android.intent.action.VIEW;${pkg ? `package=${pkg};` : ''}S.browser_fallback_url=${encodeURIComponent(url)};end`; };
 const MOODS = [['😞', 'Rough'], ['🙁', 'Meh'], ['😐', 'Okay'], ['🙂', 'Good'], ['😄', 'Great']];
 const BASE_TAGS = ['Work', 'Social', 'Family', 'Errands', 'Learning', 'Rest', 'Travel', 'Outdoors', 'Creative'];
-const SPORT_TAGS = ['Run', 'Gym', 'Golf 9', 'Golf 18', 'Golf Indoor', 'Tennis', 'Padel'];
+const SPORT_TAGS = ['Run', 'Walk', 'Gym', 'Golf 9', 'Golf 18', 'Golf Indoor', 'Tennis', 'Padel'];
 const isSport = r => (r.tags || []).some(t => t === 'Sport' || SPORT_TAGS.includes(t)); // 'Sport' kept so older entries still count
 const WORK_START = 9, WORK_END = 18; // window used to find your longest free block
 const HH = 52, LW = 46; // timeline: pixels per hour, width of the hour labels
@@ -409,9 +419,10 @@ function weekHtml(date) {
   return `<div class="wk"><button class="ar" data-act="wprev" aria-label="Previous week">‹</button>${days.map(d => `<button class="wd ${d === date ? 'on' : ''} ${d === t ? 'today' : ''}" data-day="${d}">${parseYmd(d).toLocaleDateString([], { weekday: 'narrow' })}<b>${parseYmd(d).getDate()}</b></button>`).join('')}<button class="ar" data-act="wnext" aria-label="Next week">›</button></div>`;
 }
 function healthLine(d) {
-  const h = S.health[d] || {}, y = S.health[addDays(d, -1)] || {};
-  const p = [h.sleepMinutes != null && `Slept ${dur(h.sleepMinutes)}`, h.restingHr != null && `resting ${Math.round(h.restingHr)} bpm`, y.steps != null && `${fmt(y.steps)} steps the day before`].filter(Boolean);
-  return p.length ? `<p class="health">${p.join(' · ')}</p>` : '';
+  const h = S.health[d] || {};
+  const p = [h.sleepMinutes != null && `Slept ${dur(h.sleepMinutes)}`, h.restingHr != null && `resting ${Math.round(h.restingHr)} bpm`].filter(Boolean);
+  const tiles = (h.steps != null || h.caloriesOut != null) ? `<div class="vit num">${h.steps != null ? `<div><b>${fmt(h.steps)}</b><span>steps so far</span></div>` : ''}${h.caloriesOut != null ? `<div><b>${fmt(h.caloriesOut)}</b><span>kcal burned so far</span></div>` : ''}</div>` : '';
+  return tiles + (p.length ? `<p class="health">${p.join(' · ')}</p>` : '');
 }
 function bucketTasks(open, date) {
   const t = today(), soonEnd = addDays(date, 3), b = { overdue: [], onDay: [], timed: [], waiting: [], progress: [], soon: [], nodate: [], later: 0 };
@@ -618,6 +629,8 @@ function moreHtml() {
     <a class="menu" href="${TASKS_DB_URL}" target="_blank" rel="noopener"><i>☑</i><span>Task database<small>Open in Notion</small></span></a>
     <a class="menu" href="${POCKET_CRM_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(POCKET_CRM_URL, POCKET_CRM_PACKAGE))}"><i>☎</i><span>Pocket CRM<small>Your contacts, people and next meetings</small></span></a>
     <a class="menu" href="${LINKEDIN_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(LINKEDIN_URL, 'com.linkedin.android'))}"><i>in</i><span>LinkedIn<small>Opens the LinkedIn app</small></span></a>
+    <span class="lbl2">Racket Rankings</span>
+    <div class="mini">${[['Overview', ''], ['Matches', '#/matches'], ['Opponents', '#/opponents'], ['Rankings', '#/rankings']].map(([t, h]) => `<a href="${RANKINGS_URL}${h}" target="_blank" rel="noopener" data-android="${esc(intentLink(RANKINGS_URL + h, RANKINGS_PACKAGE))}">${t}</a>`).join('')}</div>
     <button class="menu" data-act="to-portfolio"><i>◔</i><span>Portfolio<small>${portfolioSubtitle()}</small></span></button>
     <button class="menu" data-act="to-history"><i>↗</i><span>History<small>Mood over time and patterns</small></span></button>
     <button class="menu" data-act="to-settings"><i>⚙</i><span>Settings<small>Connection, theme, backup</small></span></button>`;
@@ -631,9 +644,11 @@ function insightHtml(days) {
   const lines = [
     cmp('Sleep 7h or more', withSleep.filter(x => x.h.sleepMinutes >= 420), withSleep.filter(x => x.h.sleepMinutes < 420), '7h+ of sleep', 'less sleep'),
     cmp('Days with sport', rows.filter(x => isSport(x.r)), rows.filter(x => !isSport(x.r)), 'sport', 'no sport'),
+    cmp('Days with alcohol', rows.filter(x => x.r.alcohol), rows.filter(x => !x.r.alcohol), 'alcohol', 'no alcohol'),
+    cmp('Days with sex', rows.filter(x => x.r.sex), rows.filter(x => !x.r.sex), 'sex', 'none'),
     cmp('Days with 8,000+ steps', rows.filter(x => x.h && x.h.steps >= 8000), rows.filter(x => x.h && x.h.steps != null && x.h.steps < 8000), '8,000+ steps', 'fewer steps'),
   ].filter(Boolean);
-  return `<div class="card"><h3>Patterns</h3>${lines.length ? `<div class="kv num">${lines.join('')}</div>` : `<p class="empty">Patterns show up once you have at least four logged days on each side of a comparison (sleep, sport, steps). You have ${rows.length} mood entries in this period.</p>`}
+  return `<div class="card"><h3>Patterns</h3>${lines.length ? `<div class="kv num">${lines.join('')}</div>` : `<p class="empty">Patterns show up once you have at least four logged days on each side of a comparison (sleep, sport, steps, alcohol). You have ${rows.length} mood entries in this period.</p>`}
     <p class="muted" style="font-size:12px;margin:10px 0 0">These are averages of your own entries, not proof that one thing causes the other.</p></div>`;
 }
 function sportHtml(days) {
@@ -701,6 +716,9 @@ function reviewHtml() {
       <div class="chips">${SPORT_TAGS.map(t => `<button class="chip ${(r.tags || []).includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}</div>
       <span class="lbl2">What was it about?</span>
       <div class="chips">${tags.map(t => `<button class="chip ${(r.tags || []).includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}<button class="chip" data-act="new-tag">+ tag</button></div>
+      <span class="lbl2">Also</span>
+      <label class="tick"><input type="checkbox" data-flag="alcohol" ${r.alcohol ? 'checked' : ''}> Had alcohol</label>
+      <label class="tick"><input type="checkbox" data-flag="sex" ${r.sex ? 'checked' : ''}> Had sex</label>
       <span class="lbl2">What happened</span>
       <textarea class="field" id="did" style="margin-top:0" placeholder="Meetings, workout, who you saw, anything worth remembering">${esc(r.did || '')}</textarea>
       <span class="lbl2">Best moment or one win</span>
@@ -713,7 +731,7 @@ let saveTimer;
 function patchReview(patch) {
   const r = S.reviews[reviewDate] || (S.reviews[reviewDate] = {});
   Object.assign(r, patch, { updatedAt: Date.now() });
-  const empty = !r.mood && !r.energy && !(r.tags || []).length && !(r.did || '').trim() && !(r.win || '').trim();
+  const empty = !r.mood && !r.energy && !r.alcohol && !r.sex && !(r.tags || []).length && !(r.did || '').trim() && !(r.win || '').trim();
   if (empty) delete S.reviews[reviewDate];
   save();
   const el = $('saved'); if (el) el.textContent = 'Saved ✓';
@@ -721,6 +739,7 @@ function patchReview(patch) {
 function bindReview(root) {
   root.querySelectorAll('[data-mood]').forEach(b => b.onclick = () => { const v = +b.dataset.mood, cur = (S.reviews[reviewDate] || {}).mood; patchReview({ mood: cur === v ? null : v }); render(); });
   root.querySelectorAll('[data-energy]').forEach(b => b.onclick = () => { const v = +b.dataset.energy, cur = (S.reviews[reviewDate] || {}).energy; patchReview({ energy: cur === v ? null : v }); render(); });
+  root.querySelectorAll('[data-flag]').forEach(b => b.onchange = () => { patchReview({ [b.dataset.flag]: b.checked }); render(); });
   root.querySelectorAll('[data-tag]').forEach(b => b.onclick = () => {
     const t = b.dataset.tag, cur = (S.reviews[reviewDate] || {}).tags || [];
     patchReview({ tags: cur.includes(t) ? cur.filter(x => x !== t) : [...cur, t] }); render();
@@ -1289,7 +1308,7 @@ function loadDemo() {
     S.health[d] = Object.assign(S.health[d] || {}, { steps: 4000 + seed * 900, sleepMinutes: 360 + seed * 14, sleepDeepMin: 60 + seed, sleepRemMin: 80 + seed * 2, restingHr: 55 + (seed % 5), caloriesOut: 2300 + seed * 60, activeKcal: 500 + seed * 35, hrv: 40 + (seed % 7) * 2 });
     if (i % 4 !== 0) S.reviews[d] = { mood: Math.min(5, Math.max(1, S.health[d].sleepMinutes >= 420 ? mood + 1 : mood)), energy: 1 + (seed % 5), tags: [['Work'], ['Work', 'Run'], ['Social', 'Family', 'Golf 9'], ['Rest'], ['Work', 'Learning', 'Padel']][i % 5], did: ['Busy day of meetings, then a run.', 'Dinner with friends.', 'Quiet day, caught up on admin.', 'Long planning session.'][i % 4], win: i % 3 ? '' : 'Finished the report', updatedAt: Date.now() - i, demo: true };
   }
-  S.health[t] = Object.assign(S.health[t] || {}, { sleepMinutes: 432, sleepDeepMin: 74, sleepRemMin: 98, restingHr: 56, hrv: 46 });
+  S.health[t] = Object.assign(S.health[t] || {}, { steps: 5240, caloriesOut: 1860, sleepMinutes: 432, sleepDeepMin: 74, sleepRemMin: 98, restingHr: 56, hrv: 46 });
   S.health[addDays(t, -1)] = Object.assign(S.health[addDays(t, -1)] || {}, { steps: 9120 });
   S.crypto = { holdings: [{ id: 1, symbol: 'BTC', name: 'Bitcoin', amount: 0.05 }, { id: 1027, symbol: 'ETH', name: 'Ethereum', amount: 1.2 }, { id: 74, symbol: 'DOGE', name: 'Dogecoin', amount: 1500 }], quotes: {}, at: 0 };
   S.demo = true; S.status = {}; save();
