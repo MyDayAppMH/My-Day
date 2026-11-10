@@ -59,6 +59,10 @@ a { color: var(--ink); }
 .vit > div { flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
 .vit b { display: block; font-size: 20px; }
 .vit span { font-size: 12px; color: var(--muted); }
+.thead { display: flex; gap: 8px; align-items: center; }
+.tog { flex: 1; display: flex; justify-content: space-between; align-items: center; text-align: left; background: none; border: 0; padding: 4px 2px; font-size: 14px; color: var(--muted); }
+.tog i { font-style: normal; font-size: 16px; }
+.track { padding-top: 8px; padding-bottom: 8px; }
 .cnt { display: flex; gap: 8px; align-items: stretch; }
 .cnt .big { flex: 1; display: grid; grid-template-columns: 1fr auto; align-items: center; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; }
 .cnt .big b { font-size: 24px; }
@@ -523,7 +527,7 @@ function dayHtml() {
     ${weekHtml(d)}
     <div class="stack">
     ${needReview ? `<div class="nudge"><span><b>How was yesterday?</b><span class="muted" style="font-size:14px">30 seconds to log it.</span></span><button class="btn day" data-act="review-yesterday">Log it</button></div>` : ''}
-    ${isToday ? readinessCard(d) : ''}${isToday ? healthLine(d) : ''}${isToday ? `<div class="card track">${trackHtml(d, false)}</div>` : ''}${isToday ? portfolioLine() : ''}
+    ${isToday ? readinessCard(d) : ''}${isToday ? healthLine(d) : ''}${d <= today() ? trackCard(d) : ''}${isToday ? portfolioLine() : ''}
     ${allDay.length ? `<div class="allday">${allDay.map(e => `<span>${esc(e.title)}</span>`).join('')}</div>` : ''}
     ${trayHtml(d, b)}
     ${sh ? `<p class="shape"><b>${sh.count} meeting${sh.count > 1 ? 's' : ''}</b> · ${dur(sh.mins)} booked${sh.free ? ` · longest free block <b>${timeStr(sh.free[0])}–${timeStr(sh.free[1])}</b>` : ''}</p>` : ''}
@@ -765,6 +769,12 @@ function setFlag(date, key, on) {
   patchDay(date, { [key]: on });
 }
 const litres = n => (n * GLASS_ML / 1000).toFixed(2).replace(/\.?0+$/, '');
+/** The day screen's box: one slim line when closed (with a quick +1 glass), the full counters when open. It edits the same day entry the Review tab shows. */
+function trackCard(d) {
+  const r = S.reviews[d] || {}, open = !!S.settings.trackOpen, w = r.water || 0, n = drinkTotal(r);
+  const sum = [w ? `💧 ${w}` : '', n ? `🍺 ${n}` : '', r.travel ? '✈ travelling' : '', r.ill ? '🤒 ill or injured' : ''].filter(Boolean).join(' · ') || 'Water, alcohol, travel, ill';
+  return `<div class="card track"><div class="thead"><button class="tog" data-act="track-toggle" aria-expanded="${open}"><span>${d === today() ? '' : `<b>${esc(shortDate(d))}</b> · `}${esc(sum)}</span><i>${open ? '▴' : '▾'}</i></button>${open ? '' : `<button class="sm" data-cnt data-date="${d}" data-key="water" data-by="1" aria-label="Add a glass of water">+💧</button>`}</div>${open ? `<div style="margin-top:8px">${trackHtml(d, false)}</div>` : ''}</div>`;
+}
 /** Water counter, drink counters (only while "drinking alcohol" is ticked), travel and illness. Shared by the day screen and Review. */
 function trackHtml(date, withSex) {
   const r = S.reviews[date] || {}, w = r.water || 0, tick = (k, label) => `<label class="tick"><input type="checkbox" data-flag="${k}" data-date="${date}" ${r[k] ? 'checked' : ''}> ${label}</label>`;
@@ -1225,6 +1235,7 @@ document.addEventListener('click', ev => {
 async function act(a) {
   if (a === 'wprev') { viewDate = addDays(viewDate, -7); render(); loadDay(viewDate); }
   else if (a === 'wnext') { viewDate = addDays(viewDate, 7); render(); loadDay(viewDate); }
+  else if (a === 'track-toggle') { S.settings.trackOpen = !S.settings.trackOpen; save(); render(); }
   else if (a === 'today') { viewDate = today(); didScroll = false; render(); loadDay(viewDate); }
   else if (a === 'rprev') { reviewDate = addDays(reviewDate, -1); render(); loadDay(reviewDate); }
   else if (a === 'rnext') { reviewDate = addDays(reviewDate, 1); render(); loadDay(reviewDate); }
