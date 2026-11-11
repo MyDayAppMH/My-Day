@@ -101,6 +101,7 @@ S.sports=Object.assign({plans:{},weeks:{}},S.sports||{});
 const sportId=()=>crypto.randomUUID();
 const sportsKinds=['Gym','Run','Tennis','Padel','Golf'];
 const sportsMarker=id=>'[myday-activity:'+id+']';
+const sportsClassTime=iso=>new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Madrid',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(iso));
 const sportsDay=iso=>!String(iso).includes('T')?String(iso).slice(0,10):new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Madrid',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(iso));
 function sportsPersist(){save();}
 function sportsWeek(){return S.sports.weeks[sportsDate]||null;}
@@ -117,7 +118,7 @@ function sportsReconcile(events,at){
  for(const p of Object.values(S.sports.plans)){
   if(p.deleted)continue;
   const found=events.find(e=>(p.existingEvent?(e.id===p.event?.id):(e.description||'').includes(sportsMarker(p.id))));
-  if(found){p.event={id:found.id,uid:found.uid,start:found.start,link:found.link};if(p.kind==='Class')p.calendarPlaced=true;else p.confirmed=true;p.uncertain=false;p.canceled=false;p.actualDate=sportsDay(found.start);p.updatedAt=at;}
+  if(found){p.event={id:found.id,uid:found.uid,start:found.start,link:found.link};if(p.kind==='Class'){p.calendarPlaced=true;p.date=sportsDay(found.start);p.time=sportsClassTime(found.start);if(found.end)p.endTime=sportsClassTime(found.end)}else p.confirmed=true;p.uncertain=false;p.canceled=false;p.actualDate=sportsDay(found.start);p.updatedAt=at;}
   else if((p.confirmed||p.calendarPlaced||p.uncertain)&&p.actualDate>=sportsDate&&p.actualDate<addDays(sportsDate,7)){
    if(p.kind==='Class')p.calendarPlaced=false;else p.confirmed=false;p.uncertain=true;p.canceled=true;p.updatedAt=at;
   }
@@ -213,7 +214,7 @@ function sportsEventForm(id){
  const key='event:'+id,p=S.sports.plans[key],date=sportsDay(e.start),kind=sportOf(e),match=['Tennis','Padel'].includes(kind);
  openSheet(`<h2>${esc(e.title)}</h2><p>${esc(shortDate(date))} · ${esc(timeStr(e.start))}</p><p class="muted">${esc(e.description||'No result in this event yet.')}</p><p class="muted">Scheduled time alone does not mean played. If you played, confirm here without making another calendar entry. Official results should update the original event.</p><div class="row"><button class="btn day" id="swPlayed">${match?'Played · result pending':'Confirm completed'}</button>${p?'<button class="btn" id="swUnplayed">Undo played confirmation</button>':''}<button class="btn" id="swDone">Close</button></div>`);
  $('swDone').onclick=closeSheet;
- $('swPlayed').onclick=()=>{if(kind==='Class'&&Date.parse(e.end||e.start)>Date.now())return toast('Confirm attendance only after the class has finished.');S.sports.plans[key]={id:key,title:e.title,kind,date,actualDate:date,confirmed:true,attended:kind==='Class',calendarPlaced:kind==='Class',time:timeStr(e.start),endTime:timeStr(e.end),event:{id:e.id,uid:e.uid,start:e.start,link:e.link},existingEvent:true,updatedAt:Date.now()};save();closeSheet();render()};
+ $('swPlayed').onclick=()=>{if(kind==='Class'&&Date.parse(e.end||e.start)>Date.now())return toast('Confirm attendance only after the class has finished.');S.sports.plans[key]={id:key,title:e.title,kind,date,actualDate:date,confirmed:true,attended:kind==='Class',calendarPlaced:kind==='Class',time:kind==='Class'?sportsClassTime(e.start):timeStr(e.start),endTime:kind==='Class'?sportsClassTime(e.end):timeStr(e.end),event:{id:e.id,uid:e.uid,start:e.start,link:e.link},existingEvent:true,updatedAt:Date.now()};save();closeSheet();render()};
  if($('swUnplayed'))$('swUnplayed').onclick=()=>{S.sports.plans[key]={...p,deleted:true,updatedAt:Date.now()};save();closeSheet();render()};
 }
 
