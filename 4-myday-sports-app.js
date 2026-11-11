@@ -19,7 +19,7 @@ const drinkTotal = r => DRINKS.reduce((n, [k]) => n + ((r.drinks || {})[k] || 0)
 const drank = r => !!(r && (r.alcohol || drinkTotal(r) > 0));
 const MOODS = [['😞', 'Rough'], ['🙁', 'Meh'], ['😐', 'Okay'], ['🙂', 'Good'], ['😄', 'Great']];
 const BASE_TAGS = ['Work', 'Social', 'Family', 'Errands', 'Learning', 'Rest', 'Travel', 'Outdoors', 'Creative'];
-const SPORT_TAGS = ['Run', 'Walk', 'Gym', 'Golf 9', 'Golf 18', 'Golf Indoor', 'Tennis', 'Padel'];
+const SPORT_TAGS = ['Run', 'Walk', 'Gym', 'Golf 9', 'Golf 18', 'Golf Indoor', 'Tennis', 'Padel', 'Golf', 'Class'];
 const isSport = r => (r.tags || []).some(t => t === 'Sport' || SPORT_TAGS.includes(t)); // 'Sport' kept so older entries still count
 const WORK_START = 9, WORK_END = 18; // window used to find your longest free block
 const HH = 52, LW = 46; // timeline: pixels per hour, width of the hour labels
@@ -109,7 +109,7 @@ function sportOf(e){
  const t=String(e.title||'');if(/^Class · /i.test(t))return 'Class';
  if(/^(book|booking|reserve|reserva|deadline|remember|reminder)\b/i.test(t)||/Reserva Tenis|Green Fee/i.test(t))return '';
  if(/\b(gym|gimnasio)\b/i.test(t))return 'Gym';
- if(/\b(run|running|carrera)\b/i.test(t))return 'Run';
+ if(/\b(run|running|carrera)\b/i.test(t))return 'Run';if(/\b(walk|walking|caminar)\b/i.test(t))return 'Walk';
  if(/\b(tennis|tenis)\b/i.test(t))return 'Tennis';
  if(/\b(padel|pádel|PTG)\b/i.test(t))return 'Padel';
  if(/\b(golf)\b/i.test(t))return 'Golf';return '';
@@ -151,12 +151,47 @@ function sportsRows(){
   if(e.status==='cancelled'||e.response==='declined'||used.has(e.id||evKey(e)))continue;
   const kind=sportOf(e);if(!kind)continue;
   // User rule: gym/run entries confirm done on add. Match time alone never proves played.
-  const result=kind!=='Class'&&(['Gym','Run'].includes(kind)||/\b(Resultado|Result|Score):\s*\S/i.test(e.description||'')||/\[(?:sports-source:gym\||myday-activity:)[^\]]+\]/.test(e.description||''));
+  const result=kind!=='Class'&&(['Gym','Run','Walk'].includes(kind)||/\b(Resultado|Result|Score):\s*\S/i.test(e.description||'')||/\[(?:sports-source:gym\||myday-activity:)[^\]]+\]/.test(e.description||''));
   const date=sportsDay(e.start);if(date<sportsDate||date>=addDays(sportsDate,7))continue;
   rows.push({date,title:e.title,kind,status:result?'Done':date<today()?'Confirm played':'Scheduled',event:e,time:e.allDay?'All day':timeStr(e.start)});
  }
  return rows.sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
 }
+
+// Only auto-owned chips are removed on cancellation or a changed activity date.
+// Existing manual tags, text, mood and counters are never overwritten.
+function sportsReviewTag(kind,title){
+ if(kind!=='Golf')return kind;
+ if(/\b(indoor|simulator|simulador)\b/i.test(title))return 'Golf Indoor';
+ if(/\b18\b/.test(title))return 'Golf 18';if(/\b9\b/.test(title))return 'Golf 9';return 'Golf';
+}
+function sportsSyncReview(){
+ const current=sportsDate,items=new Map(),wanted={};
+ const put=(key,v,at)=>{if(!items.has(key)||items.get(key).at<at)items.set(key,{...v,at})};
+ for(const [date,c] of Object.entries(S.cache||{}))for(const e of c.events||[]){const kind=sportOf(e);if(!kind)continue;
+  const done=e.status!=='cancelled'&&e.response!=='declined'&&kind!=='Class'&&(['Gym','Run','Walk'].includes(kind)||/\b(Resultado|Result|Score):\s*\S/i.test(e.description||'')||/\[(?:sports-source:gym\||myday-activity:)[^\]]+\]/.test(e.description||''));
+  put('event:'+(e.id||evKey(e)),{date:sportsDay(e.start),kind,title:e.title,done},c.at||0);
+ }
+ for(const [week,c] of Object.entries(S.sports.weeks||{})){for(const [key,v] of items)if(key.startsWith('event:')&&v.date>=week&&v.date<addDays(week,7)&&v.at<(c.at||0)&&!(c.events||[]).some(e=>'event:'+(e.id||evKey(e))===key))put(key,{...v,done:false},c.at||0);for(const e of c.events||[])if(e.status==='cancelled'||e.response==='declined')put('event:'+(e.id||evKey(e)),{date:sportsDay(e.start),kind:sportOf(e),title:e.title,done:false},c.at||0);sportsDate=week;for(const r of sportsRows())put(r.p?'plan:'+r.p.id:'event:'+(r.event.id||evKey(r.event)),{date:r.date,kind:r.kind,title:r.title,done:r.status.startsWith('Done')},c.at||0)}sportsDate=current;
+ // Plans are authoritative even before a week has loaded, and suppress old event copies.
+ for(const p of Object.values(S.sports.plans||{})){
+  if(p.event?.id)items.delete('event:'+p.event.id);
+  const done=!p.deleted&&(p.kind==='Class'?!!p.attended:!!p.confirmed&&!p.uncertain&&!p.canceled);
+  const date=p.actualDate||p.date;
+  items.set('plan:'+p.id,{date,kind:p.kind,title:p.title,done});
+ }
+ for(const v of items.values())if(v.done&&/^\d{4}-\d{2}-\d{2}$/.test(v.date)){const tag=sportsReviewTag(v.kind,v.title||'');if(SPORT_TAGS.includes(tag))(wanted[v.date]||(wanted[v.date]=new Set())).add(tag)}
+ let changed=false;
+ for(const date of new Set([...Object.keys(wanted),...Object.keys(S.reviews)])){
+  const existing=S.reviews[date],r=existing||{},prev=r.sportsAutoTags||[],tags=r.tags||[],need=[...(wanted[date]||[])];
+  const manual=tags.filter(t=>!prev.includes(t)),owned=need.filter(t=>!manual.includes(t)),next=[...new Set([...manual,...need])];
+  if(JSON.stringify(tags)!==JSON.stringify(next)||JSON.stringify(prev)!==JSON.stringify(owned)){
+   S.reviews[date]={...r,tags:next,sportsAutoTags:owned,updatedAt:Date.now()};changed=true;
+  }
+ }
+ if(changed)save();
+}
+
 function sportsHtml(){
  const week=sportsWeek(),rows=sportsRows(),plans=rows.filter(r=>!r.status.startsWith('Done')).length,done=rows.filter(r=>r.status.startsWith('Done')).length;
  return `<div class="top"><div><h1>Sports week</h1><p class="muted">${shortDate(sportsDate)} - ${shortDate(addDays(sportsDate,6))}</p></div></div>
@@ -356,6 +391,7 @@ function dayShape(events, date) {
 /* ---------- rendering ---------- */
 const NAV = [['today', 'Day', '▦'], ['sports', 'Sports', '◷'], ['inbox', 'Inbox', '✉'], ['review', 'Review', '☺'], ['more', 'More', '≡']];
 function render() {
+  sportsSyncReview();
   const active = { history: 'more', settings: 'more', portfolio: 'more' }[view] || view, unread = S.inbox ? S.inbox.unread : 0;
   $('nav').innerHTML = NAV.map(([k, l, ic]) => `<button data-v="${k}" class="${active === k ? 'on' : ''}"><i>${ic}</i>${l}${k === 'inbox' && unread ? `<span class="nb">${unread > 99 ? '99+' : unread}</span>` : ''}</button>`).join('');
   $('nav').querySelectorAll('button').forEach(b => b.onclick = () => go(b.dataset.v));
@@ -704,7 +740,7 @@ function reviewHtml() {
       <span class="lbl2">Energy</span>
       <div class="scale">${[1, 2, 3, 4, 5].map(n => `<button data-energy="${n}" class="${r.energy === n ? 'on' : ''}">${n}</button>`).join('')}</div>
       <div class="scalehint"><span>drained</span><span>full of energy</span></div>
-      <span class="lbl2">Sport</span>
+      <span class="lbl2">Sport</span><p class="muted" style="font-size:12px">Completed activities select their sport automatically on the activity day. Plans and class calendar holds do not.</p>
       <div class="chips">${SPORT_TAGS.map(t => `<button class="chip ${(r.tags || []).includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}</div>
       <span class="lbl2">What was it about?</span>
       <div class="chips">${tags.map(t => `<button class="chip ${(r.tags || []).includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}<button class="chip" data-act="new-tag">+ tag</button></div>
@@ -760,7 +796,7 @@ function bindReview(root) {
   root.querySelectorAll('[data-mood]').forEach(b => b.onclick = () => { const v = +b.dataset.mood, cur = (S.reviews[reviewDate] || {}).mood; patchReview({ mood: cur === v ? null : v }); render(); });
   root.querySelectorAll('[data-energy]').forEach(b => b.onclick = () => { const v = +b.dataset.energy, cur = (S.reviews[reviewDate] || {}).energy; patchReview({ energy: cur === v ? null : v }); render(); });
   root.querySelectorAll('[data-tag]').forEach(b => b.onclick = () => {
-    const t = b.dataset.tag, cur = (S.reviews[reviewDate] || {}).tags || [];
+    const t = b.dataset.tag, cur = (S.reviews[reviewDate] || {}).tags || [];if((S.reviews[reviewDate]?.sportsAutoTags||[]).includes(t))return toast('Selected from a completed activity. Change its completion in Sports to undo.');
     patchReview({ tags: cur.includes(t) ? cur.filter(x => x !== t) : [...cur, t] }); render();
   });
   const typed = (id, key) => { const el = $(id); if (!el) return; el.oninput = () => { clearTimeout(saveTimer); $('saved').textContent = 'Saving…'; saveTimer = setTimeout(() => patchReview({ [key]: el.value }), 400); }; el.onblur = () => { clearTimeout(saveTimer); patchReview({ [key]: el.value }); }; };
