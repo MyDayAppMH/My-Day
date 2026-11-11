@@ -1,6 +1,6 @@
 
 'use strict';
-const BUILD = '2026-11-11.sports4';
+const BUILD = '2026-11-11.sports5';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -299,20 +299,19 @@ function sportsImport(){
 let sportsGymPopup=null,sportsGymPairUntil=0,sportsGymSent=false;
 function sportsGymStatus(text){sessionStorage.setItem('myday.gym.handoff',text);let el=$('sportsGymHandoff');if(!el){const b=document.querySelector('[data-sw="connect-gym"]');if(b){el=document.createElement('p');el.id='sportsGymHandoff';el.className='muted swmeta';b.parentElement.after(el)}}if(el)el.textContent=text;const day=$('dayGymHandoff');if(day)day.textContent=text;toast(text);}
 
-function sportsConnectGym(){
+async function sportsConnectGym(){
  if(!connected())return toast('Connect MyDay in Settings first.');
  if(baseUrl()!=='https://calorie-tracker.matthias-homan.workers.dev')return toast('Check the calendar Worker address in Settings.');
- sportsGymSent=false;sportsGymPairUntil=Date.now()+15000;
- sportsGymPopup=window.open('https://gymmh.github.io/gym-app/?connectCalendar=1','_blank');
- if(!sportsGymPopup){sportsGymStatus('Gym window did not open. Allow this window in Chrome, then try again.');return}sportsGymStatus('Waiting for Gym to receive the connection. Keep both tabs open.');setTimeout(()=>{if(sportsGymPopup&&Date.now()>=sportsGymPairUntil){sportsGymStatus('Gym did not confirm receiving the connection. Use both pages in the same Chrome browser, not separately opened apps. Gym Settings > Check connection can show its status.');sportsGymPopup=null}},15500);
+ if(sportsGymSent)return;sportsGymSent=true;
+ sportsGymStatus('Preparing a secure Gym connection...');
+ try{
+  const r=await post('/api/gym/pair',{});
+  if(typeof r.pair!=='string'||!r.pair.startsWith('pair2.'))throw Error('Connection service did not return a pairing link.');
+  sportsGymStatus('Opening Gym. Its Calendar status will confirm the connection.');
+  location.assign('https://gymmh.github.io/gym-app/#gymPair='+encodeURIComponent(r.pair));
+ }catch(e){sportsGymSent=false;sportsGymStatus('Gym connection was not opened: '+e.message+'. Existing data has not changed.');}
 }
-window.addEventListener('message',e=>{
- if(e.origin!=='https://gymmh.github.io'||e.source!==sportsGymPopup||Date.now()>sportsGymPairUntil||!connected())return;
- if(e.data?.type==='gym-calendar-connect-saved'){sportsGymPairUntil=0;sportsGymPopup=null;sportsGymStatus('Gym confirmed saving the connection details. In Gym Settings, use Check connection to verify Google Calendar access.');return}
- if(e.data?.type!=='gym-calendar-connect-request'||sportsGymSent)return;sportsGymSent=true;
- e.source.postMessage({type:'myday-calendar-connect',url:baseUrl(),key:S.settings.appKey},'https://gymmh.github.io');
- sportsGymStatus('Connection sent. Waiting for Gym to confirm it was saved.');
-});
+window.addEventListener('pageshow',()=>{sportsGymSent=false});
 document.addEventListener('click',e=>{const b=e.target.closest('[data-sw]');if(!b)return;const a=b.dataset.sw;
  if(a==='prev'||a==='next'){sportsDate=addDays(sportsDate,a==='prev'?-7:7);render();loadSportsWeek()}
  else if(a==='today'){sportsDate=weekStart(today());render();loadSportsWeek()}
