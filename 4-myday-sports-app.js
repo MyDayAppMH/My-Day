@@ -164,7 +164,7 @@ function sportsHtml(){
  ${sportsError?`<div class="errbox">${esc(sportsError)} ${!connected()?'<button class="btn" data-act="goto-settings">Settings</button>':''}</div>`:''}
  <p class="muted swmeta">${week?'Calendar checked '+new Date(week.at).toLocaleString():'Calendar not loaded for this week.'} ${week&&Date.now()-week.at>3600000?'Saved copy, refresh to check changes.':''}</p>
  ${Array.from({length:7},(_,i)=>addDays(sportsDate,i)).map(date=>{const list=rows.filter(r=>r.date===date);return `<section class="card swday ${date===today()?'swtoday':''}"><h3>${esc(dayLabel(date))}${date===today()?' <span class="pill">today</span>':''}</h3>${list.map(r=>`<div class="swactivity"><div class="swline"><b>${esc(r.title)}</b><span class="swstate ${r.status.startsWith('Done')?'swdone':''}">${esc(r.status)}</span></div><div class="muted swmeta">${esc(r.kind)}${r.time?' · '+esc(r.time):''}${r.p?.target?' · '+esc(r.p.target):''}${r.p?.series?' · '+esc(r.p.series):''}</div><div class="row swbuttons">${r.p?`<button class="btn" data-sw="edit" data-id="${esc(r.p.id)}">${r.p.confirmed?'Details':'Edit / add to calendar'}</button>${r.p.kind==='Gym'&&!r.p.existingEvent?`<a class="btn" href="${GYM_URL+'?mydayActivity='+encodeURIComponent(r.p.id)}" target="_blank" rel="noopener">Open Gym</a>`:''}`:`<button class="btn" data-sw="confirm-event" data-id="${esc(r.event.id||evKey(r.event))}">${r.status.startsWith('Done')?'Result / details':r.status==='Confirm played'?(r.kind==='Tennis'||r.kind==='Padel'?'Played / result pending':'Confirm completed'):'Details'}</button>`}${r.event?.link?`<a class="btn" href="${esc(r.event.link)}" target="_blank" rel="noopener">Calendar</a>`:''}</div></div>`).join('')||'<p class="muted swmeta">Nothing planned or logged.</p>'}</section>`}).join('')}
- <div class="row"><button class="btn" data-sw="connect-gym">Connect Gym calendar</button><button class="btn" data-sw="import">Import training plan (CSV)</button></div><p class="muted swmeta">Gym and run plans stay here until you add them to your calendar. Adding confirms done, even before starting; cancel the calendar entry if you do not do it, then refresh here. Missing or moved entries are flagged for checking. Scheduled matches stay separate until a result or your played confirmation. Connect Gym once on this device for future saved workouts. Golf appears from calendar entries, not a live Golf feed yet. No pain tracking or extra scores.</p>`;
+ <p id="sportsGymHandoff" class="muted swmeta">${esc(sessionStorage.getItem('myday.gym.handoff')||'')}</p><div class="row"><button class="btn" data-sw="connect-gym">Connect Gym calendar</button><button class="btn" data-sw="import">Import training plan (CSV)</button></div><p class="muted swmeta">Gym and run plans stay here until you add them to your calendar. Adding confirms done, even before starting; cancel the calendar entry if you do not do it, then refresh here. Missing or moved entries are flagged for checking. Scheduled matches stay separate until a result or your played confirmation. Connect Gym once on this device for future saved workouts. Golf appears from calendar entries, not a live Golf feed yet. No pain tracking or extra scores.</p>`;
 }
 function sportsPlanForm(id){
  const p=id?S.sports.plans[id]:null,date=p?.date||today(),confirmed=!!p?.confirmed;
@@ -231,18 +231,22 @@ function sportsImport(){
  }catch(e){$('swImportPreview').textContent=e.message}
  };
 }
-let sportsGymPopup=null,sportsGymPairUntil=0;
+let sportsGymPopup=null,sportsGymPairUntil=0,sportsGymSent=false;
+function sportsGymStatus(text){sessionStorage.setItem('myday.gym.handoff',text);let el=$('sportsGymHandoff');if(!el){const b=document.querySelector('[data-sw="connect-gym"]');if(b){el=document.createElement('p');el.id='sportsGymHandoff';el.className='muted swmeta';b.parentElement.after(el)}}if(el)el.textContent=text;toast(text);}
+
 function sportsConnectGym(){
  if(!connected())return toast('Connect MyDay in Settings first.');
  if(baseUrl()!=='https://calorie-tracker.matthias-homan.workers.dev')return toast('Check the calendar Worker address in Settings.');
- sportsGymPairUntil=Date.now()+120000;
+ sportsGymSent=false;sportsGymPairUntil=Date.now()+15000;
  sportsGymPopup=window.open('https://gymmh.github.io/gym-app/?connectCalendar=1','_blank');
- if(!sportsGymPopup)toast('Allow this one Gym window, then try again.');
+ if(!sportsGymPopup){sportsGymStatus('Gym window did not open. Allow this window in Chrome, then try again.');return}sportsGymStatus('Waiting for Gym to receive the connection. Keep both tabs open.');setTimeout(()=>{if(sportsGymPopup&&Date.now()>=sportsGymPairUntil){sportsGymStatus('Gym did not confirm receiving the connection. Use both pages in the same Chrome browser, not separately opened apps. Gym Settings > Check connection can show its status.');sportsGymPopup=null}},15500);
 }
 window.addEventListener('message',e=>{
- if(e.origin!=='https://gymmh.github.io'||e.source!==sportsGymPopup||Date.now()>sportsGymPairUntil||e.data?.type!=='gym-calendar-connect-request'||!connected())return;
+ if(e.origin!=='https://gymmh.github.io'||e.source!==sportsGymPopup||Date.now()>sportsGymPairUntil||!connected())return;
+ if(e.data?.type==='gym-calendar-connect-saved'){sportsGymPairUntil=0;sportsGymPopup=null;sportsGymStatus('Gym confirmed saving the connection details. In Gym Settings, use Check connection to verify Google Calendar access.');return}
+ if(e.data?.type!=='gym-calendar-connect-request'||sportsGymSent)return;sportsGymSent=true;
  e.source.postMessage({type:'myday-calendar-connect',url:baseUrl(),key:S.settings.appKey},'https://gymmh.github.io');
- sportsGymPairUntil=0;sportsGymPopup=null;toast('Calendar connection sent to Gym.');
+ sportsGymStatus('Connection sent. Waiting for Gym to confirm it was saved.');
 });
 document.addEventListener('click',e=>{const b=e.target.closest('[data-sw]');if(!b)return;const a=b.dataset.sw;
  if(a==='prev'||a==='next'){sportsDate=addDays(sportsDate,a==='prev'?-7:7);render();loadSportsWeek()}
