@@ -297,7 +297,7 @@ function sportsImport(){
  };
 }
 let sportsGymPopup=null,sportsGymPairUntil=0,sportsGymSent=false;
-function sportsGymStatus(text){sessionStorage.setItem('myday.gym.handoff',text);let el=$('sportsGymHandoff');if(!el){const b=document.querySelector('[data-sw="connect-gym"]');if(b){el=document.createElement('p');el.id='sportsGymHandoff';el.className='muted swmeta';b.parentElement.after(el)}}if(el)el.textContent=text;toast(text);}
+function sportsGymStatus(text){sessionStorage.setItem('myday.gym.handoff',text);let el=$('sportsGymHandoff');if(!el){const b=document.querySelector('[data-sw="connect-gym"]');if(b){el=document.createElement('p');el.id='sportsGymHandoff';el.className='muted swmeta';b.parentElement.after(el)}}if(el)el.textContent=text;const day=$('dayGymHandoff');if(day)day.textContent=text;toast(text);}
 
 function sportsConnectGym(){
  if(!connected())return toast('Connect MyDay in Settings first.');
@@ -532,7 +532,7 @@ function dayHtml() {
   const calMsg = !c ? `<p class="empty">${connected() ? (loading ? 'Loading your calendar…' : S.status.cal && !S.status.cal.ok ? esc(S.status.cal.message) : 'Nothing loaded yet.') : 'Connect Google in Settings to see your meetings.'}</p>` : '';
   return `<div class="hd"><div><h1>${longDate(d)}</h1><div class="mu">${esc(sub)}</div></div>${pill(isToday ? '' : '<button class="pill" data-act="today">Today</button>')}</div>
     ${weekHtml(d)}
-    <a class="menu" href="${GYM_URL}" target="_blank" rel="noopener"><i>🏋</i><span>Gym<small>Workouts, programme and planned classes</small></span></a>
+    <button class="menu" data-sw="connect-gym" style="width:100%;text-align:left"><i>🏋</i><span>Gym<small>Open Gym and connect calendar</small></span></button><p id="dayGymHandoff" class="muted" style="font-size:12px;margin:0">${esc(sessionStorage.getItem('myday.gym.handoff')||'')}</p>
     <div class="stack">
     ${needReview ? `<div class="nudge"><span><b>How was yesterday?</b><span class="muted" style="font-size:14px">30 seconds to log it.</span></span><button class="btn day" data-act="review-yesterday">Log it</button></div>` : ''}
     ${isToday ? readinessCard(d) : ''}${isToday ? healthLine(d) : ''}${d <= today() ? trackCard(d) : ''}${isToday ? portfolioLine() : ''}
