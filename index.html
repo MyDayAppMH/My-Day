@@ -216,6 +216,7 @@ svg text { fill: var(--muted); font-size: 10px; font-family: inherit; }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(100px + env(safe-area-inset-bottom)); z-index: 30; max-width: 92vw; background: var(--ink); color: var(--bg); border-radius: 12px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; font-size: 14px; }
 .toast button { background: none; border: 0; color: var(--bg); font-weight: 700; text-decoration: underline; padding: 0; }
 [hidden] { display: none !important; }
+.swmeta{font-size:12px;line-height:1.5}.swday h3{margin:0 0 8px}.swtoday{border-color:var(--acc)}.swactivity{padding:10px 0;border-top:1px solid var(--line)}.swline{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.swline b{overflow-wrap:anywhere;min-width:0}.swstate{font-size:11px;white-space:nowrap;border:1px solid var(--line);border-radius:9px;padding:2px 6px}.swdone{color:var(--good)}.swbuttons{margin:8px 0 0}.swbuttons .btn{font-size:12px;min-height:36px}.swcontrols .btn{min-width:40px}.swsummary{align-items:center}.swsummary .pill{flex-shrink:0;font-size:12px}.swsummary .btn{flex:1;min-width:135px}
 </style>
 </head>
 <body>
@@ -227,7 +228,7 @@ svg text { fill: var(--muted); font-size: 10px; font-family: inherit; }
 
 <script>
 'use strict';
-const BUILD = '2026-11-10.1';
+const BUILD = '2026-11-11.sports1';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -322,6 +323,148 @@ function applyTheme() {
   $('themeColor').setAttribute('content', light ? '#f4f4f5' : '#111113');
 }
 
+/* ---------- sports week: plans are private, explicit calendar add confirms done ---------- */
+let sportsDate=weekStart(today()),sportsBusy=false,sportsError='';
+S.sports=Object.assign({plans:{},weeks:{}},S.sports||{});
+const sportId=()=>crypto.randomUUID();
+const sportsKinds=['Gym','Run','Tennis','Padel','Golf'];
+const sportsMarker=id=>'[myday-activity:'+id+']';
+const sportsDay=iso=>!String(iso).includes('T')?String(iso).slice(0,10):new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Madrid',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(iso));
+function sportsPersist(){save();}
+function sportsWeek(){return S.sports.weeks[sportsDate]||null;}
+function sportOf(e){
+ const t=String(e.title||'');
+ if(/^(book|booking|reserve|reserva|deadline|remember|reminder)\b/i.test(t)||/Reserva Tenis|Green Fee/i.test(t))return '';
+ if(/\b(gym|gimnasio)\b/i.test(t))return 'Gym';
+ if(/\b(run|running|carrera)\b/i.test(t))return 'Run';
+ if(/\b(tennis|tenis)\b/i.test(t))return 'Tennis';
+ if(/\b(padel|pádel|PTG)\b/i.test(t))return 'Padel';
+ if(/\b(golf)\b/i.test(t))return 'Golf';return '';
+}
+function sportsReconcile(events,at){
+ for(const p of Object.values(S.sports.plans)){
+  if(p.deleted)continue;
+  const found=events.find(e=>(p.existingEvent?(e.id===p.event?.id):(e.description||'').includes(sportsMarker(p.id))));
+  if(found){p.event={id:found.id,uid:found.uid,start:found.start,link:found.link};p.confirmed=true;p.uncertain=false;p.canceled=false;p.actualDate=sportsDay(found.start);p.updatedAt=at;}
+  else if((p.confirmed||p.uncertain)&&p.actualDate>=sportsDate&&p.actualDate<addDays(sportsDate,7)){
+   p.confirmed=false;p.uncertain=true;p.canceled=true;p.updatedAt=at;
+  }
+ }
+}
+async function loadSportsWeek(){
+ if(!connected()){sportsError=S.demo?'Demo mode: no calendar writes.':'Connect MyDay to Google in Settings to load matches and confirm activities.';render();return}
+ sportsBusy=true;sportsError='';render();const requested=sportsDate;
+ try{
+  const from=parseYmd(requested).toISOString(),to=parseYmd(addDays(requested,7)).toISOString();
+  const d=await api(`/api/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+  if(!Array.isArray(d.events))throw Error('Calendar response was incomplete.');
+  if(d.errors?.length)throw Error('Some calendars could not refresh. Keeping the previous copy; completion has not been changed.');
+  const at=Date.now();S.sports.weeks[requested]={at,events:d.events};
+  if(requested===sportsDate&&d.events.length<100)sportsReconcile(d.events,at);else if(d.events.length>=100)sportsError='This busy week may be incomplete. Missing entries are not treated as canceled.';
+  save();
+ }catch(e){sportsError=e.message}finally{sportsBusy=false;if(view==='sports')render()}
+}
+function sportsRows(){
+ const week=sportsWeek(),events=week?.events||[],rows=[],used=new Set();
+ for(const p of Object.values(S.sports.plans)){
+  if(p.deleted)continue;
+  const found=events.find(e=>(p.existingEvent?(e.id===p.event?.id):(e.description||'').includes(sportsMarker(p.id))));
+  const date=found?sportsDay(found.start):p.confirmed?(p.actualDate||p.date):p.date;
+  if(date<sportsDate||date>=addDays(sportsDate,7))continue;
+  if(found)used.add(found.id||evKey(found));
+  rows.push({date,title:p.title,kind:p.kind,status:found||p.confirmed?(p.existingEvent&&['Tennis','Padel'].includes(p.kind)&&!/\b(Resultado|Result|Score):\s*\S/i.test(found?.description||'')?'Done · result pending':'Done'):p.uncertain?'Check calendar':p.canceled?'Canceled / plan kept':'Planned',p,event:found||p.event,time:found?timeStr(found.start):p.confirmed&&p.event?.start?timeStr(p.event.start):p.time||''});
+ }
+ for(const e of events){
+  if(e.status==='cancelled'||e.response==='declined'||used.has(e.id||evKey(e)))continue;
+  const kind=sportOf(e);if(!kind)continue;
+  // Calendar time alone never proves that an unlinked match or activity happened.
+  const result=/\b(Resultado|Result|Score):\s*\S/i.test(e.description||'')||/\[sports-source:gym\|[^\]]+\]/.test(e.description||'');
+  const date=sportsDay(e.start);if(date<sportsDate||date>=addDays(sportsDate,7))continue;
+  rows.push({date,title:e.title,kind,status:result?'Done':date<today()?'Confirm played':'Scheduled',event:e,time:e.allDay?'All day':timeStr(e.start)});
+ }
+ return rows.sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+}
+function sportsHtml(){
+ const week=sportsWeek(),rows=sportsRows(),plans=rows.filter(r=>!r.status.startsWith('Done')).length,done=rows.filter(r=>r.status.startsWith('Done')).length;
+ return `<div class="top"><div><h1>Sports week</h1><p class="muted">${shortDate(sportsDate)} - ${shortDate(addDays(sportsDate,6))}</p></div></div>
+ <div class="row swcontrols"><button class="btn" data-sw="prev" aria-label="Previous week">‹</button><button class="btn" data-sw="today">This week</button><button class="btn" data-sw="next" aria-label="Next week">›</button><button class="btn" data-sw="refresh" ${sportsBusy?'disabled':''}>${sportsBusy?'Updating…':'Refresh'}</button></div>
+ <div class="row swsummary"><span class="pill">${done} done</span><span class="pill">${plans} planned / to confirm</span><button class="btn day" data-sw="new">+ Plan / activity</button></div>
+ ${sportsError?`<div class="errbox">${esc(sportsError)} ${!connected()?'<button class="btn" data-act="goto-settings">Settings</button>':''}</div>`:''}
+ <p class="muted swmeta">${week?'Calendar checked '+new Date(week.at).toLocaleString():'Calendar not loaded for this week.'} ${week&&Date.now()-week.at>3600000?'Saved copy, refresh to check changes.':''}</p>
+ ${Array.from({length:7},(_,i)=>addDays(sportsDate,i)).map(date=>{const list=rows.filter(r=>r.date===date);return `<section class="card swday ${date===today()?'swtoday':''}"><h3>${esc(dayLabel(date))}${date===today()?' <span class="pill">today</span>':''}</h3>${list.map(r=>`<div class="swactivity"><div class="swline"><b>${esc(r.title)}</b><span class="swstate ${r.status.startsWith('Done')?'swdone':''}">${esc(r.status)}</span></div><div class="muted swmeta">${esc(r.kind)}${r.time?' · '+esc(r.time):''}${r.p?.target?' · '+esc(r.p.target):''}${r.p?.series?' · '+esc(r.p.series):''}</div><div class="row swbuttons">${r.p?`<button class="btn" data-sw="edit" data-id="${esc(r.p.id)}">${r.p.confirmed?'Details':'Edit / add to calendar'}</button>${r.p.kind==='Gym'&&!r.p.confirmed?`<a class="btn" href="${GYM_URL}" target="_blank" rel="noopener">Open Gym</a>`:''}`:`<button class="btn" data-sw="confirm-event" data-id="${esc(r.event.id||evKey(r.event))}">${r.status.startsWith('Done')?'Result / details':r.status==='Confirm played'?(r.kind==='Tennis'||r.kind==='Padel'?'Played / result pending':'Confirm completed'):'Details'}</button>`}${r.event?.link?`<a class="btn" href="${esc(r.event.link)}" target="_blank" rel="noopener">Calendar</a>`:''}</div></div>`).join('')||'<p class="muted swmeta">Nothing planned or logged.</p>'}</section>`}).join('')}
+ <div class="row"><button class="btn" data-sw="import">Import training plan (CSV)</button></div><p class="muted swmeta">Gym and run plans stay here until you add them to your calendar. Adding confirms done, even before starting; cancel the calendar entry if you do not do it, then refresh here. Missing or moved entries are flagged for checking. Scheduled matches stay separate until a result or your played confirmation. Other sports appear from calendar entries, not a live Gym/Golf feed yet. No pain tracking or extra scores.</p>`;
+}
+function sportsPlanForm(id){
+ const p=id?S.sports.plans[id]:null,date=p?.date||today(),confirmed=!!p?.confirmed;
+ openSheet(`<h2>${p?'Activity':'Plan / activity'}</h2>${confirmed?'<p class="muted">Confirmed done by your calendar add. To undo, cancel that calendar entry and refresh this week. The plan will stay.</p>':''}
+ <label>Sport</label><select class="field" id="swKind">${sportsKinds.map(k=>`<option ${k===(p?.kind||'Gym')?'selected':''}>${k}</option>`).join('')}</select>
+ <label>Session</label><input class="field" id="swTitle" maxlength="150" value="${esc(p?.title||'')}" placeholder="e.g. Easy run or Upper body">
+ <label>Day</label><input class="field" type="date" id="swDate" value="${esc(date)}">
+ <label>Time (optional for a rough plan)</label><input class="field" type="time" id="swTime" value="${esc(p?.time||'')}">
+ <label>Target (optional)</label><input class="field" id="swTarget" maxlength="200" value="${esc(p?.target||'')}" placeholder="Distance, duration or your plan's instructions">
+ <div class="row" style="margin-top:16px"><button class="btn" id="swSave" ${confirmed?'disabled':''}>Save plan</button>${!confirmed?'<button class="btn day" id="swCalendar">Add to calendar = done</button>':''}${p&&!confirmed?'<button class="btn" id="swRemove">Remove plan</button>':''}<button class="btn" id="swClose">Close</button></div>${p?.uncertain?'<p class="errbox">The calendar link needs checking. The event may have moved, been removed, or the last add may not have finished. Open Calendar before adding again.</p><button class="btn" id="swResetLink">I checked: no calendar entry remains</button>':''}`);
+ $('swClose').onclick=closeSheet;
+ if($('swResetLink'))$('swResetLink').onclick=()=>{if(confirm('Confirm you checked Calendar and this activity is not there, including other days?')){p.uncertain=false;p.confirmed=false;p.canceled=false;p.event=null;p.updatedAt=Date.now();save();closeSheet();render()}};
+ const collect=()=>{const kind=$('swKind').value,title=$('swTitle').value.trim()||kind,d=$('swDate').value;if(!/^\d{4}-\d{2}-\d{2}$/.test(d))throw Error('Pick a day.');return {...p,id:p?.id||sportId(),kind,title,date:d,time:$('swTime').value,target:$('swTarget').value.trim(),updatedAt:Date.now()}};
+ $('swSave').onclick=()=>{try{const n=collect();S.sports.plans[n.id]=n;save();closeSheet();sportsDate=weekStart(n.date);render()}catch(e){toast(e.message)}};
+ if($('swRemove'))$('swRemove').onclick=()=>{if(confirm('Remove this plan?')){S.sports.plans[id]={...p,deleted:true,updatedAt:Date.now()};save();closeSheet();render()}};
+ if($('swCalendar'))$('swCalendar').onclick=()=>{try{const n=collect();S.sports.plans[n.id]=n;save();sportsCalendarForm(n)}catch(e){toast(e.message)}};
+}
+function sportsWall(date,time){
+ const parts=(date+'T'+time).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);if(!parts)return new Date(NaN);
+ const a=parts.slice(1).map(Number),wall=Date.UTC(a[0],a[1]-1,a[2],a[3],a[4]);let guess=wall;
+ const f=new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Madrid',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+ for(let i=0;i<3;i++){const v=Object.fromEntries(f.formatToParts(new Date(guess)).map(x=>[x.type,x.value]));guess+=wall-Date.UTC(+v.year,+v.month-1,+v.day,+v.hour,+v.minute);}
+ const v=Object.fromEntries(f.formatToParts(new Date(guess)).map(x=>[x.type,x.value]));if(v.year!==parts[1]||v.month!==parts[2]||v.day!==parts[3]||v.hour!==parts[4]||v.minute!==parts[5])return new Date(NaN);return new Date(guess);
+}
+function sportsCalendarForm(p){
+ if(!connected())return toast('Connect Google in Settings first. Your plan is saved.');
+ if(p.uncertain)return toast('Check the linked entry in Calendar before adding again.');
+ openSheet(`<h2>Add ${esc(p.kind)} = done</h2><p class="muted">This is your completion confirmation on your main Google Calendar, even if you add it before starting. Cancel the calendar entry if you do not do it. No guests or invitations.</p>
+ <label>Actual day</label><input class="field" id="swActual" type="date" value="${esc(p.date)}"><label>Start (Madrid time)</label><input class="field" id="swStart" type="time" value="${esc(p.time||'09:00')}"><label>End</label><input class="field" id="swEnd" type="time" value="${p.time?hm(Number(p.time.slice(0,2))*60+Number(p.time.slice(3))+60):'10:00'}">
+ <div class="row" style="margin-top:16px"><button class="btn day" id="swCommit">Add to calendar and confirm done</button><button class="btn" id="swCancel">Back</button></div>`);
+ $('swCancel').onclick=()=>sportsPlanForm(p.id);
+ $('swCommit').onclick=async()=>{
+  const date=$('swActual').value,start=sportsWall(date,$('swStart').value),end=sportsWall(date,$('swEnd').value);
+  if(!date||isNaN(start)||isNaN(end)||end<=start)return toast('Choose a valid day and end after start.');
+  $('swCommit').disabled=true;
+  p.actualDate=date;p.uncertain=true;p.updatedAt=Date.now();save();
+  try{
+   const added=await post('/api/calendar/add',{title:p.kind+' · '+p.title,start:start.toISOString(),end:end.toISOString(),timeZone:'Europe/Madrid',calendarId:'primary',guests:[],meet:false,description:'Completed activity confirmed by calendar add.\n'+sportsMarker(p.id)});
+   p.confirmed=true;p.uncertain=false;p.canceled=false;p.event={id:added.event?.id,uid:added.event?.uid,start:added.event?.start||start.toISOString(),link:added.event?.link};p.updatedAt=Date.now();save();closeSheet();sportsDate=weekStart(date);toast('Added to calendar · confirmed done');await loadSportsWeek();
+  }catch(e){closeSheet();sportsDate=weekStart(date);sportsError='Could not confirm the add: '+e.message+'. Refresh before retrying so no duplicate is created.';render()}
+ };
+}
+function sportsEventForm(id){
+ const e=(sportsWeek()?.events||[]).find(e=>(e.id||evKey(e))===id);if(!e)return;
+ const key='event:'+id,p=S.sports.plans[key],date=sportsDay(e.start),kind=sportOf(e),match=['Tennis','Padel'].includes(kind);
+ openSheet(`<h2>${esc(e.title)}</h2><p>${esc(shortDate(date))} · ${esc(timeStr(e.start))}</p><p class="muted">${esc(e.description||'No result in this event yet.')}</p><p class="muted">Scheduled time alone does not mean played. If you played, confirm here without making another calendar entry. Official results should update the original event.</p><div class="row"><button class="btn day" id="swPlayed">${match?'Played · result pending':'Confirm completed'}</button>${p?'<button class="btn" id="swUnplayed">Undo played confirmation</button>':''}<button class="btn" id="swDone">Close</button></div>`);
+ $('swDone').onclick=closeSheet;
+ $('swPlayed').onclick=()=>{S.sports.plans[key]={id:key,title:e.title,kind,date,actualDate:date,confirmed:true,event:{id:e.id,uid:e.uid,start:e.start,link:e.link},existingEvent:true,updatedAt:Date.now()};save();closeSheet();render()};
+ if($('swUnplayed'))$('swUnplayed').onclick=()=>{S.sports.plans[key]={...p,deleted:true,updatedAt:Date.now()};save();closeSheet();render()};
+}
+function sportsImport(){
+ openSheet(`<h2>Import a training plan</h2><p class="muted">CSV with columns date,sport,title,target,time. Date is YYYY-MM-DD; sport is Gym or Run. This imports rough plans only, never calendar entries or completed activities. Use a plan you have chosen; no training prescription is generated here.</p><input id="swFile" type="file" accept=".csv,text/csv"><div id="swImportPreview"></div><button class="btn" id="swImportClose">Close</button>`);
+ $('swImportClose').onclick=closeSheet;
+ $('swFile').onchange=async()=>{
+ try{
+  const f=$('swFile').files[0];if(!f)return;if(f.size>300000)throw Error('Use a CSV smaller than 300 KB.');
+  const lines=(await f.text()).replace(/^\uFEFF/,'').trim().split(/\r?\n/);if(lines.length>501)throw Error('Up to 500 sessions per import.');
+  const parse=line=>{const a=[];let v='',q=false;for(let i=0;i<line.length;i++){const c=line[i];if(c==='"'){if(q&&line[i+1]==='"'){v+='"';i++}else q=!q}else if(c===','&&!q){a.push(v.trim());v=''}else v+=c}if(q)throw Error('Unclosed CSV quote. Use one session per line.');a.push(v.trim());return a};
+  const h=parse(lines.shift()).map(x=>x.toLowerCase());if(!['date','sport','title'].every(x=>h.includes(x)))throw Error('Required columns: date,sport,title.');
+  const entries=lines.filter(Boolean).map((line,i)=>{const a=parse(line),get=k=>a[h.indexOf(k)]||'',date=get('date'),kind=get('sport'),title=get('title');if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||ymd(parseYmd(date))!==date||!['Gym','Run'].includes(kind)||!title||title.length>150||get('target').length>200||get('time')&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(get('time')))throw Error('Check row '+(i+2)+': valid date, Gym/Run, title and optional HH:MM time.');return {date,kind,title,target:get('target'),time:get('time')}});
+  const unique=entries.filter(n=>!Object.values(S.sports.plans).some(p=>!p.deleted&&p.date===n.date&&p.kind===n.kind&&p.title===n.title));
+  $('swImportPreview').innerHTML=`<p>${entries.length} sessions, ${unique.length} new. No calendar changes.</p><ul>${unique.slice(0,8).map(p=>`<li>${esc(p.date+' · '+p.kind+' · '+p.title)}</li>`).join('')}</ul><label>Plan name (optional)</label><input class="field" id="swSeries" maxlength="100"><button class="btn day" id="swImportCommit">Import ${unique.length} rough plans</button>`;
+  $('swImportCommit').onclick=()=>{const series=$('swSeries').value.trim();for(const n of unique){const id=sportId();S.sports.plans[id]={...n,id,series,updatedAt:Date.now()}}save();closeSheet();if(unique.length)sportsDate=weekStart(unique[0].date);render();toast('Training plan imported · no calendar entries made')};
+ }catch(e){$('swImportPreview').textContent=e.message}
+ };
+}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-sw]');if(!b)return;const a=b.dataset.sw;
+ if(a==='prev'||a==='next'){sportsDate=addDays(sportsDate,a==='prev'?-7:7);render();loadSportsWeek()}
+ else if(a==='today'){sportsDate=weekStart(today());render();loadSportsWeek()}
+ else if(a==='refresh')loadSportsWeek();else if(a==='new')sportsPlanForm();else if(a==='edit')sportsPlanForm(b.dataset.id);else if(a==='confirm-event')sportsEventForm(b.dataset.id);else if(a==='import')sportsImport();
+});
+
 /* ---------- Worker access ---------- */
 function baseUrl() { const b = (S.settings.baseUrl || '').trim().replace(/\/$/, ''); return /^https?:\/\//.test(b) ? b : null; }
 async function api(path, opts = {}) {
@@ -392,14 +535,14 @@ function dayShape(events, date) {
 }
 
 /* ---------- rendering ---------- */
-const NAV = [['today', 'Day', '▦'], ['inbox', 'Inbox', '✉'], ['review', 'Review', '☺'], ['more', 'More', '≡']];
+const NAV = [['today', 'Day', '▦'], ['sports', 'Sports', '◷'], ['inbox', 'Inbox', '✉'], ['review', 'Review', '☺'], ['more', 'More', '≡']];
 function render() {
   const active = { history: 'more', settings: 'more', portfolio: 'more' }[view] || view, unread = S.inbox ? S.inbox.unread : 0;
   $('nav').innerHTML = NAV.map(([k, l, ic]) => `<button data-v="${k}" class="${active === k ? 'on' : ''}"><i>${ic}</i>${l}${k === 'inbox' && unread ? `<span class="nb">${unread > 99 ? '99+' : unread}</span>` : ''}</button>`).join('');
   $('nav').querySelectorAll('button').forEach(b => b.onclick = () => go(b.dataset.v));
   $('fabslot').innerHTML = view === 'today' ? '<button class="fab" data-act="fab" aria-label="Add">+</button>' : '';
   const app = $('app');
-  app.innerHTML = { today: dayHtml, inbox: inboxHtml, review: reviewHtml, more: moreHtml, history: historyHtml, settings: settingsHtml, portfolio: portfolioHtml }[view]();
+  app.innerHTML = { today: dayHtml, inbox: inboxHtml, review: reviewHtml, more: moreHtml, history: historyHtml, settings: settingsHtml, portfolio: portfolioHtml, sports: sportsHtml }[view]();
   bind(app); bind($('fabslot'));
   if (slideDir && view === 'today') { app.classList.remove('slide-next', 'slide-prev'); void app.offsetWidth; app.classList.add('slide-' + slideDir); }
   slideDir = '';
@@ -419,6 +562,7 @@ function go(v) {
   if (v === 'review') loadDay(reviewDate);
   if (v === 'today') loadDay(viewDate);
   if (v === 'inbox') loadInbox();
+  if (v === 'sports') loadSportsWeek();
 }
 function pill(extra = '') {
   let p;
@@ -1404,7 +1548,7 @@ const SharedBackup = (() => {
 
 // What a backup holds: reviews and counters, prep notes, tags. Portfolio amounts only when asked for. Never the connection or keys.
 function backupObject(withHoldings = true) {
-  return { app: 'myday', version: 1, exportedAt: Date.now(), reviews: S.reviews, prep: S.prep, tags: S.tags, ...(withHoldings ? { holdings: S.crypto.holdings } : {}) };
+  return { app: 'myday', version: 1, exportedAt: Date.now(), reviews: S.reviews, prep: S.prep, tags: S.tags, sports: {plans:S.sports.plans}, ...(withHoldings ? { holdings: S.crypto.holdings } : {}) };
 }
 /** Adds a backup to what is on the phone: a day is replaced only by a newer version of it, nothing is deleted. Returns the number of days taken over. */
 function mergeBackup(d) {
@@ -1412,6 +1556,7 @@ function mergeBackup(d) {
   let n = 0;
   for (const [date, rv] of Object.entries(d.reviews)) { const mine = S.reviews[date]; if (!mine || (rv.updatedAt || 0) > (mine.updatedAt || 0)) { S.reviews[date] = rv; n++; } }
   for (const [k, v] of Object.entries(d.prep || {})) if (!S.prep[k]) S.prep[k] = v;
+  for(const [id,p] of Object.entries(d.sports?.plans||{})){if(p&&typeof p==='object'&&p.id===id&&(!S.sports.plans[id]||(p.updatedAt||0)>(S.sports.plans[id].updatedAt||0)))S.sports.plans[id]=p;}
   for (const t of d.tags || []) if (!S.tags.includes(t)) S.tags.push(t);
   for (const h of d.holdings || []) if (h && h.id && !S.crypto.holdings.some(x => x.id === h.id)) S.crypto.holdings.push(h);
   save();
@@ -1506,7 +1651,7 @@ render();
     else setTimeout(() => { if (q === 'task') openAddTask(); else openEventForm({ date: today() }); }, 0);
   }
 }
-SharedBackup.auto('myday', () => (Object.keys(S.reviews).length ? backupObject(!!S.settings.backupHoldings) : null));
+SharedBackup.auto('myday', () => (Object.keys(S.reviews).length || Object.keys(S.sports.plans).length ? backupObject(!!S.settings.backupHoldings) : null));
 if (connected()) {
   loadDay(viewDate); loadInbox(); loadPrices();
   if (!Object.keys(S.health).length) syncHealth(30); else if (Date.now() - S.healthAt > 30 * 60 * 1000) syncHealth(7);
@@ -1524,4 +1669,4 @@ setInterval(() => { if (view === 'portfolio' && !document.hidden && !$('overlay'
 setInterval(() => { if (rollDay() && connected() && !$('overlay').innerHTML) loadDay(viewDate); if (view === 'today' && viewDate === today() && !$('overlay').innerHTML && !document.hidden) render(); }, 60 * 1000); // keeps the now-line and "next" label current
 </script>
 </body>
-</html>
+  </html>
