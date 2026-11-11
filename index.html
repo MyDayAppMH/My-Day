@@ -236,6 +236,8 @@ const POCKET_CRM_URL = 'https://contact-capture.matthias-homan.workers.dev/';
 const LINKEDIN_URL = 'https://www.linkedin.com/feed/';
 const RANKINGS_URL = 'https://matthias-sport.github.io/racket-rankings-app/';
 const RANKINGS_PACKAGE = 'org.chromium.webapk.a0d7a67882b031cc1_v2'; // the installed Racket Rankings app (chrome://webapks lists it)
+const GYM_URL = 'https://gymmh.github.io/gym-app/';
+const GYM_PACKAGE = 'org.chromium.webapk.a09d48c4912ac408f_v2'; // the installed Gym app (chrome://webapks lists it)
 const POCKET_CRM_PACKAGE = 'org.chromium.webapk.a5bf4b8d4443f6622_v2'; // the installed Pocket CRM app (Chrome's chrome://webapks lists it)
 const intentLink = (url, pkg) => { const u = new URL(url); return `intent://${u.host}${u.pathname}${u.search}${u.hash}#Intent;scheme=${u.protocol.replace(':', '')};action=android.intent.action.VIEW;${pkg ? `package=${pkg};` : ''}S.browser_fallback_url=${encodeURIComponent(url)};end`; };
 const DRINKS = [['beer', 'Beer'], ['wine', 'Wine'], ['long', 'Long drink'], ['shot', 'Shot']];
@@ -653,6 +655,725 @@ function moreHtml() {
     <a class="menu" href="${POCKET_CRM_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(POCKET_CRM_URL, POCKET_CRM_PACKAGE))}"><i>☎</i><span>Pocket CRM<small>Your contacts, people and next meetings</small></span></a>
     <a class="menu" href="${LINKEDIN_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(LINKEDIN_URL, 'com.linkedin.android'))}"><i>in</i><span>LinkedIn<small>Opens the LinkedIn app</small></span></a>
     <a class="menu" href="${RANKINGS_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(RANKINGS_URL, RANKINGS_PACKAGE))}"><i>🎾</i><span>Racket Rankings<small>Your tennis and padel results and rankings</small></span></a>
+    <a class="menu" href="${GYM_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(GYM_URL, GYM_PACKAGE))}"><i>🏋</i><span>Gym<small>Your workouts, programme and progress</small></span></a>
+    <button class="menu" data-act="to-portfolio"><i>◔</i><span>Portfolio<small>${portfolioSubtitle()}</small></span></button>
+    <button class="menu" data-act="to-history"><i>↗</i><span>History<small>Mood over time and patterns</small></span></button>
+    <button class="menu" data-act="to-settings"><i>⚙</i><span>Settings<small>Connection, theme, backup</small></span></button>`;
+}
+function insightHtml(days) {
+  const rows = days.map(d => ({ d, r: S.reviews[d], h: S.health[d] })).filter(x => x.r && x.r.mood);
+  const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+  const cmp = (label, yes, no, yl, nl) => (yes.length >= 4 && no.length >= 4)
+    ? `<span class="k">${label}</span><b>${avg(yes.map(x => x.r.mood)).toFixed(1)} vs ${avg(no.map(x => x.r.mood)).toFixed(1)}</b><span class="k" style="grid-column:1/-1;font-size:12px;margin-top:-4px">average mood: ${yl} (${yes.length} days) vs ${nl} (${no.length} days)</span>` : '';
+  const withSleep = rows.filter(x => x.h && x.h.sleepMinutes != null);
+  const lines = [
+    cmp('Sleep 7h or more', withSleep.filter(x => x.h.sleepMinutes >= 420), withSleep.filter(x => x.h.sleepMinutes < 420), '7h+ of sleep', 'less sleep'),
+    cmp('Days with sport', rows.filter(x => isSport(x.r)), rows.filter(x => !isSport(x.r)), 'sport', 'no sport'),
+    cmp('Days with alcohol', rows.filter(x => drank(x.r)), rows.filter(x => !drank(x.r)), 'alcohol', 'no alcohol'),
+    cmp('Days with 6+ glasses of water', rows.filter(x => (x.r.water || 0) >= 6), rows.filter(x => (x.r.water || 0) < 6), '6+ glasses', 'less water'),
+    cmp('Travel days', rows.filter(x => x.r.travel), rows.filter(x => !x.r.travel), 'travelling', 'at home'),
+    cmp('Days ill or injured', rows.filter(x => x.r.ill), rows.filter(x => !x.r.ill), 'ill or injured', 'well'),
+    cmp('Days with sex', rows.filter(x => x.r.sex), rows.filter(x => !x.r.sex), 'sex', 'none'),
+    cmp('Days with 8,000+ steps', rows.filter(x => x.h && x.h.steps >= 8000), rows.filter(x => x.h && x.h.steps != null && x.h.steps < 8000), '8,000+ steps', 'fewer steps'),
+  ].filter(Boolean);
+  return `<div class="card"><h3>Patterns</h3>${lines.length ? `<div class="kv num">${lines.join('')}</div>` : `<p class="empty">Patterns show up once you have at least four logged days on each side of a comparison (sleep, sport, steps, alcohol, water). You have ${rows.length} mood entries in this period.</p>`}
+    <p class="muted" style="font-size:12px;margin:10px 0 0">These are averages of your own entries, not proof that one thing causes the other.</p></div>`;
+}
+function sportHtml(days) {
+  const counts = {};
+  for (const d of days) for (const t of (S.reviews[d] || {}).tags || []) if (SPORT_TAGS.includes(t)) counts[t] = (counts[t] || 0) + 1;
+  const total = days.filter(d => S.reviews[d] && isSport(S.reviews[d])).length;
+  return `<div class="card"><h3>Sport</h3>${total ? `<div class="kv num">${SPORT_TAGS.filter(t => counts[t]).map(t => `<span class="k">${esc(t)}</span><b>${counts[t]}×</b>`).join('')}<span class="k">Days with sport</span><b>${total} of ${days.length}</b></div>` : '<p class="empty">Tag a day with Run, Walk, Gym, Golf, Tennis or Padel in the Review and it shows up here.</p>'}</div>`;
+}
+function moodChart(days) {
+  const W = 340, H = 110, padL = 22, padB = 16, padT = 8, pw = W - padL - 6, ph = H - padB - padT;
+  const x = i => padL + (days.length === 1 ? pw / 2 : (i / (days.length - 1)) * pw), y = v => padT + ph - ((v - 1) / 4) * ph;
+  let svg = [1, 3, 5].map(v => `<line x1="${padL}" x2="${W - 6}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)"/><text x="${padL - 6}" y="${y(v) + 3}" text-anchor="end">${v}</text>`).join('');
+  let seg = [], path = '';
+  const flush = () => { if (seg.length > 1) path += `<polyline points="${seg.join(' ')}" fill="none" stroke="var(--ink)" stroke-width="2"/>`; seg = []; };
+  days.forEach((d, i) => { const m = (S.reviews[d] || {}).mood; if (m) seg.push(`${x(i).toFixed(1)},${y(m).toFixed(1)}`); else flush(); });
+  flush();
+  const dots = days.map((d, i) => { const m = (S.reviews[d] || {}).mood; return m ? `<circle cx="${x(i).toFixed(1)}" cy="${y(m).toFixed(1)}" r="3" fill="var(--ink)"/>` : ''; }).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Mood over time">${svg}${path}${dots}</svg>`;
+}
+function historyHtml() {
+  const t = today(), days = [];
+  for (let i = histDays - 1; i >= 0; i--) days.push(addDays(t, -i));
+  const logged = days.filter(d => S.reviews[d]);
+  const list = [...logged].reverse().map(d => {
+    const r = S.reviews[d], h = S.health[d] || {};
+    const sub = [(r.tags || []).join(', '), r.energy ? `energy ${r.energy}/5` : '', h.sleepMinutes != null ? `slept ${dur(h.sleepMinutes)}` : '', h.steps != null ? `${fmt(h.steps)} steps` : '', drinkTotal(r) ? `${drinkTotal(r)} drink${drinkTotal(r) === 1 ? '' : 's'}` : '', r.water ? `${litres(r.water)} L water` : '', r.travel ? 'travelling' : '', r.ill ? 'ill or injured' : ''].filter(Boolean).join(' · ');
+    const text = (r.win || r.did || '').split('\n')[0];
+    return `<button class="hrow" data-rev="${d}"><span class="em">${r.mood ? MOODS[r.mood - 1][0] : '•'}</span><span><span class="hd2">${shortDate(d)}</span><span class="sub">${esc(sub)}</span>${text ? `<span class="sub" style="color:var(--ink)">${esc(text.slice(0, 120))}</span>` : ''}</span></button>`;
+  }).join('');
+  return `<button class="back" data-act="to-more">‹ More</button><div class="hd"><h1>History</h1>${pill()}</div><div class="stack">
+    <div class="seg">${[14, 30, 90].map(n => `<button data-hist="${n}" class="${histDays === n ? 'on' : ''}">${n} days</button>`).join('')}</div>
+    <div class="card"><h3>Mood</h3>${moodChart(days)}<p class="muted" style="font-size:12px;margin:6px 0 0">${logged.length} of ${histDays} days logged. Gaps are days with no entry.</p></div>
+    ${sportHtml(days)}
+    ${insightHtml(days)}
+    <div class="card"><h3>Your days</h3>${list || '<p class="empty">Nothing logged yet. Try the Review tab tomorrow morning.</p>'}</div></div>`;
+}
+
+/* ----- review ----- */
+function dateBar(date, prevAct, nextAct) {
+  return `<div class="hd"><div style="display:flex;align-items:center;gap:6px">
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="My Day">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#111113" id="themeColor">
+<title>My Day</title>
+<style>
+:root {
+  --bg: #111113; --card: #19191c; --ink: #f4f4f5; --muted: #a1a1aa; --line: #2a2a2e;
+  --acc: #f4f4f5; --soft: #2a2a2e; --onacc: #111113; --task: #fb7185; --tsoft: #3b1a22;
+  --good: #4ade80; --good-soft: #14301f; --warn: #f0a04b; --warn-soft: #3a2b18; --danger: #fb7185;
+}
+:root[data-theme="light"] {
+  --bg: #f4f4f5; --card: #ffffff; --ink: #18181b; --muted: #71717a; --line: #e4e4e7;
+  --acc: #18181b; --soft: #e4e4e7; --onacc: #ffffff; --task: #be123c; --tsoft: #fde4ea;
+  --good: #15803d; --good-soft: #dcf5e4; --warn: #b45309; --warn-soft: #fbead6; --danger: #be123c;
+}
+@media (prefers-color-scheme: light) {
+  :root[data-theme="auto"] {
+    --bg: #f4f4f5; --card: #ffffff; --ink: #18181b; --muted: #71717a; --line: #e4e4e7;
+    --acc: #18181b; --soft: #e4e4e7; --onacc: #ffffff; --task: #be123c; --tsoft: #fde4ea;
+    --good: #15803d; --good-soft: #dcf5e4; --warn: #b45309; --warn-soft: #fbead6; --danger: #be123c;
+  }
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+body { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+button { font: inherit; color: inherit; cursor: pointer; }
+input, select, textarea { font: inherit; color: inherit; }
+a { color: var(--ink); }
+.wrap { max-width: 560px; margin: 0 auto; padding: calc(10px + env(safe-area-inset-top)) 16px 0; }
+.num { font-variant-numeric: tabular-nums; }
+.muted, .mu { color: var(--muted); }
+.mu { font-size: 13px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 14px; }
+.card h3 { margin: 0 0 6px; font-size: 15px; }
+.stack > * + * { margin-top: 10px; }
+.hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin: 6px 2px 8px; }
+.hd h1 { margin: 0; font-size: 22px; font-weight: 600; }
+.pill { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 5px 11px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.pill.bad { color: var(--danger); border-color: var(--danger); }
+.pills { display: flex; gap: 6px; }
+
+.wk { display: flex; align-items: center; border-bottom: 1px solid var(--line); padding: 2px 0 8px; margin-bottom: 10px; }
+.wk .ar { flex: none; width: 24px; height: 40px; border: 0; background: none; color: var(--muted); font-size: 20px; padding: 0; }
+.wk .wd { flex: 1; border: 0; background: none; text-align: center; font-size: 12px; color: var(--muted); padding: 2px 0; }
+.wk .wd b { display: block; margin: 3px auto 0; font-weight: 400; font-size: 15px; color: var(--ink); width: 36px; height: 36px; line-height: 34px; border-radius: 50%; border: 1px solid transparent; }
+.wk .wd.today b { border-color: var(--muted); }
+.wk .wd.on b { background: var(--acc); color: var(--onacc); font-weight: 600; border-color: var(--acc); }
+.vit { display: flex; gap: 8px; }
+.vit > div { flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; }
+.vit b { display: block; font-size: 20px; }
+.vit span { font-size: 12px; color: var(--muted); }
+.thead { display: flex; gap: 8px; align-items: center; }
+.tog { flex: 1; display: flex; justify-content: space-between; align-items: center; text-align: left; background: none; border: 0; padding: 4px 2px; font-size: 14px; color: var(--muted); }
+.tog i { font-style: normal; font-size: 16px; }
+.track { padding-top: 8px; padding-bottom: 8px; }
+.cnt { display: flex; gap: 8px; align-items: stretch; }
+.cnt .big { flex: 1; display: grid; grid-template-columns: 1fr auto; align-items: center; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; }
+.cnt .big b { font-size: 24px; }
+.cnt .big small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+.sm { min-width: 44px; height: 40px; border: 1px solid var(--line); background: var(--card); border-radius: 12px; font-size: 20px; font-weight: 600; }
+.sm:disabled { opacity: .35; }
+.drow { display: flex; align-items: center; gap: 10px; padding: 4px 2px; }
+.drow span { flex: 1; font-size: 15px; }
+.drow b { min-width: 24px; text-align: center; font-size: 18px; }
+.tick { display: flex; align-items: center; gap: 10px; padding: 8px 2px; font-size: 15px; }
+.tick input { width: 22px; height: 22px; accent-color: var(--acc); }
+.health { margin: 0 2px 8px; font-size: 13px; color: var(--muted); }
+.allday { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.allday span { background: var(--soft); border-radius: 8px; padding: 4px 10px; font-size: 13px; }
+.shape { font-size: 13px; color: var(--muted); margin: 6px 2px 4px; }
+.shape b { color: var(--ink); font-weight: 500; }
+
+.tl { position: relative; margin: 6px 0 4px; user-select: none; -webkit-user-select: none; }
+.tl .hl { position: absolute; left: 46px; right: 0; border-top: 1px solid var(--line); pointer-events: none; }
+.tl .hr { position: absolute; left: 0; font-size: 12px; color: var(--muted); pointer-events: none; }
+.tev { position: absolute; text-align: left; border: 0; border-left: 4px solid var(--acc); background: var(--soft); border-radius: 0 10px 10px 0; padding: 3px 8px; font-size: 13px; overflow: hidden; line-height: 1.25; }
+.tev b { font-weight: 500; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tev span { display: block; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tev.n { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--muted); }
+.tev.past { opacity: .5; }
+.tev.next { box-shadow: 0 0 0 1px var(--acc) inset; }
+.ttk { position: absolute; display: flex; align-items: center; gap: 6px; border: 1px solid var(--task); background: var(--tsoft); border-radius: 10px; padding: 0 8px 0 4px; font-size: 13px; overflow: hidden; }
+.ttk .chk { width: 22px; height: 22px; border-radius: 7px; font-size: 12px; }
+.ttk .nm { flex: 1; min-width: 0; text-align: left; background: none; border: 0; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--task); font-size: 13px; }
+.now { position: absolute; left: 40px; right: 0; border-top: 2px solid var(--task); z-index: 2; pointer-events: none; }
+.now:before { content: ""; position: absolute; left: -4px; top: -5px; width: 8px; height: 8px; border-radius: 50%; background: var(--task); }
+.badge { display: inline-block; border-radius: 6px; padding: 1px 7px; font-size: 11px; margin-left: 6px; vertical-align: 1px; background: var(--warn-soft); color: var(--warn); font-weight: 600; }
+.badge.day { background: var(--soft); color: var(--ink); }
+
+.grouphd { display: flex; justify-content: space-between; align-items: baseline; margin: 10px 2px 2px; font-size: 12px; color: var(--muted); }
+.grouphd:first-child { margin-top: 0; }
+.grouphd.bad { color: var(--danger); }
+.task { display: flex; align-items: center; gap: 12px; padding: 3px 0; border-top: 1px solid var(--line); }
+.task:first-of-type { border-top: 0; }
+.chk { flex: none; width: 28px; height: 28px; border-radius: 9px; border: 2px solid var(--muted); background: none; padding: 0; display: grid; place-items: center; font-size: 15px; line-height: 1; color: transparent; }
+.chk.on { background: var(--good); border-color: var(--good); color: var(--bg); }
+.task .tt { min-width: 0; flex: 1; text-align: left; background: none; border: 0; padding: 4px 0; }
+.task .tt span { display: block; overflow-wrap: anywhere; }
+.task .tt .sub { font-size: 12px; color: var(--muted); }
+.task.done .tt .tn { text-decoration: line-through; color: var(--muted); }
+.tray > summary { list-style: none; display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-weight: 600; font-size: 15px; }
+.tray > summary::-webkit-details-marker { display: none; }
+.tray > summary .mini { border: 1px solid var(--line); background: none; border-radius: 999px; padding: 3px 11px; font-size: 13px; font-weight: 600; }
+.tray .body { margin-top: 6px; }
+.addrow { width: 100%; margin-top: 8px; border: 1px dashed var(--line); background: none; border-radius: 12px; padding: 9px; color: var(--ink); font-weight: 600; }
+.empty { color: var(--muted); font-size: 14px; padding: 4px 2px; margin: 0; }
+.nudge { background: var(--soft); border-radius: 16px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.nudge b { display: block; }
+
+.nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--card); border-top: 1px solid var(--line); display: flex; padding-bottom: env(safe-area-inset-bottom); }
+.nav button { flex: 1; border: 0; background: none; padding: 8px 0 10px; font-size: 12px; color: var(--muted); position: relative; }
+.nav button i { display: block; font-size: 21px; line-height: 1.2; font-style: normal; }
+.nav button.on { color: var(--ink); font-weight: 600; }
+.nav .nb { position: absolute; top: 3px; left: 56%; background: var(--task); color: var(--bg); font-size: 11px; font-weight: 700; border-radius: 9px; min-width: 17px; height: 17px; line-height: 17px; }
+.fab { position: fixed; right: 18px; bottom: calc(86px + env(safe-area-inset-bottom)); z-index: 5; width: 56px; height: 56px; border-radius: 50%; border: 0; background: var(--acc); color: var(--onacc); font-size: 28px; line-height: 1; box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+
+.scrim { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 20; display: flex; align-items: flex-end; justify-content: center; }
+.sheet { width: 100%; max-width: 560px; max-height: 92vh; overflow: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 20px 20px 0 0; padding: 16px 16px calc(20px + env(safe-area-inset-bottom)); }
+.sheet h2 { margin: 0 0 4px; font-size: 19px; overflow-wrap: anywhere; }
+.row { display: flex; gap: 8px; }
+.field { width: 100%; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-top: 8px; }
+.field:focus { outline: 2px solid var(--acc); outline-offset: -1px; }
+textarea.field { min-height: 92px; resize: vertical; }
+.btn { border-radius: 12px; background: var(--card); color: var(--ink); border: 1px solid var(--line); padding: 12px 18px; font-weight: 600; text-decoration: none; display: inline-block; }
+.btn.day { background: var(--acc); color: var(--onacc); border-color: var(--acc); }
+.btn:disabled { opacity: .4; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--line); background: var(--card); border-radius: 999px; padding: 7px 13px; font-size: 14px; }
+.chip.on { background: var(--acc); color: var(--onacc); border-color: var(--acc); }
+.lbl2 { font-size: 13px; color: var(--muted); margin: 14px 2px 6px; display: block; }
+.ck2 { display: flex; align-items: center; gap: 10px; margin: 12px 2px 0; font-size: 15px; }
+.ck2 input { width: 20px; height: 20px; accent-color: var(--acc); }
+.people { font-size: 14px; margin: 4px 0; }
+.people .r { display: inline-block; width: 18px; color: var(--muted); }
+.desc { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; max-height: 220px; overflow: auto; }
+.menu { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-top: 8px; text-decoration: none; color: var(--ink); }
+.menu i { font-size: 22px; font-style: normal; width: 26px; text-align: center; }
+.menu small { display: block; color: var(--muted); font-size: 12px; }
+
+.mail { background: var(--card); border: 1px solid var(--line); border-radius: 14px; margin-top: 8px; }
+.mrow { display: flex; align-items: stretch; }
+.mail .mb { flex: 1; min-width: 0; text-align: left; background: none; border: 0; color: var(--ink); padding: 10px 6px 10px 14px; }
+.mail .l1 { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
+.mail .l1 b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mail .l1 span { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.mail .l2 { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mail .l3 { font-size: 13px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mail.open .l2 { white-space: normal; font-weight: 600; }
+.mail.open .l3 { display: none; }
+.mail .mt { flex: none; width: 60px; border: 0; border-left: 1px solid var(--line); background: none; color: var(--muted); font-size: 12px; }
+.mexp { border-top: 1px solid var(--line); padding: 10px 14px 12px; }
+.mbody { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; max-height: 55vh; overflow: auto; }
+.mact { display: flex; gap: 8px; margin-top: 12px; }
+.thread { display: block; text-decoration: none; padding: 6px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.thread:first-of-type { border-top: 0; }
+
+.moods { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.moods button { border: 1px solid var(--line); background: var(--card); border-radius: 14px; padding: 10px 0 6px; font-size: 26px; line-height: 1.1; }
+.moods button small { display: block; font-size: 11px; color: var(--muted); margin-top: 2px; }
+.moods button.on { border-color: var(--acc); box-shadow: 0 0 0 1px var(--acc) inset; background: var(--soft); }
+.scale { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.scale button { border: 1px solid var(--line); background: var(--card); border-radius: 12px; padding: 10px 0; font-weight: 600; }
+.scale button.on { border-color: var(--acc); background: var(--acc); color: var(--onacc); }
+.scalehint { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 3px; }
+.saved { font-size: 12px; color: var(--muted); text-align: right; min-height: 16px; }
+.facts ul { margin: 4px 0 8px; padding-left: 18px; font-size: 14px; }
+.facts li { margin: 3px 0; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--card); }
+.seg button { border: 0; background: none; padding: 8px 14px; font-size: 14px; color: var(--muted); }
+.seg button.on { background: var(--acc); color: var(--onacc); font-weight: 600; }
+.hrow { display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; background: none; border: 0; border-top: 1px solid var(--line); padding: 12px 2px; }
+.hrow:first-of-type { border-top: 0; }
+.hrow .em { font-size: 26px; width: 34px; text-align: center; }
+.hrow .hd2 { font-weight: 600; }
+.hrow .sub { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; display: block; }
+.kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 15px; }
+.kv .k { color: var(--muted); }
+svg text { fill: var(--muted); font-size: 10px; font-family: inherit; }
+.prow { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 8px; align-items: center; width: 100%; text-align: left; background: none; border: 0; border-top: 1px solid var(--line); padding: 11px 2px; }
+.prow:first-of-type { border-top: 0; }
+.prow .r { text-align: right; }
+.prow .sym { font-weight: 600; }
+.prow small { display: block; font-size: 12px; color: var(--muted); }
+.up { color: var(--good); } .down { color: var(--danger); }
+.tot { font-size: 32px; font-weight: 600; letter-spacing: -.5px; }
+.pline { display: block; width: 100%; text-align: left; background: none; border: 0; padding: 0 2px; margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.pline b { color: var(--ink); font-weight: 500; }
+.rd { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 10px 14px; }
+.rd .n { font-size: 34px; font-weight: 600; line-height: 1; min-width: 52px; }
+.rd .n small { font-size: 14px; font-weight: 400; color: var(--muted); }
+.rd .t b { display: block; font-weight: 600; }
+.rd .t span { display: block; font-size: 12px; color: var(--muted); }
+.bar2 { height: 6px; border-radius: 3px; background: var(--soft); overflow: hidden; margin-top: 4px; }
+.bar2 i { display: block; height: 100%; background: var(--ink); border-radius: 3px; }
+@keyframes fromRight { from { transform: translateX(32px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fromLeft { from { transform: translateX(-32px); opacity: 0; } to { transform: none; opacity: 1; } }
+.slide-next { animation: fromRight .2s ease-out; }
+.slide-prev { animation: fromLeft .2s ease-out; }
+@media (prefers-reduced-motion: reduce) { .slide-next, .slide-prev { animation: none; } }
+.back { border: 0; background: none; color: var(--muted); font-size: 14px; padding: 4px 0; }
+
+.set h3 { margin: 0 0 8px; font-size: 15px; }
+.set p { margin: 6px 0; font-size: 14px; }
+.errbox { background: var(--warn-soft); border-radius: 10px; padding: 10px 12px; font-size: 13px; word-break: break-word; margin-top: 8px; }
+.okbox { background: var(--good-soft); border-radius: 10px; padding: 10px 12px; font-size: 13px; word-break: break-word; margin-top: 8px; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(100px + env(safe-area-inset-bottom)); z-index: 30; max-width: 92vw; background: var(--ink); color: var(--bg); border-radius: 12px; padding: 10px 14px; display: flex; gap: 14px; align-items: center; font-size: 14px; }
+.toast button { background: none; border: 0; color: var(--bg); font-weight: 700; text-decoration: underline; padding: 0; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<nav class="nav" id="nav"></nav>
+<div id="fabslot"></div>
+<div id="overlay"></div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+const BUILD = '2026-11-10.1';
+const STORE_KEY = 'myday.v1';
+const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
+const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
+// Other apps. On Android an intent link asks the phone to open the app itself (the installed Pocket CRM, the LinkedIn app) and falls back to the web page when it is not installed.
+const POCKET_CRM_URL = 'https://contact-capture.matthias-homan.workers.dev/';
+const LINKEDIN_URL = 'https://www.linkedin.com/feed/';
+const RANKINGS_URL = 'https://matthias-sport.github.io/racket-rankings-app/';
+const RANKINGS_PACKAGE = 'org.chromium.webapk.a0d7a67882b031cc1_v2'; // the installed Racket Rankings app (chrome://webapks lists it)
+const GYM_URL = 'https://gymmh.github.io/gym-app/';
+const GYM_PACKAGE = 'org.chromium.webapk.a09d48c4912ac408f_v2'; // the installed Gym app (chrome://webapks lists it)
+const POCKET_CRM_PACKAGE = 'org.chromium.webapk.a5bf4b8d4443f6622_v2'; // the installed Pocket CRM app (Chrome's chrome://webapks lists it)
+const intentLink = (url, pkg) => { const u = new URL(url); return `intent://${u.host}${u.pathname}${u.search}${u.hash}#Intent;scheme=${u.protocol.replace(':', '')};action=android.intent.action.VIEW;${pkg ? `package=${pkg};` : ''}S.browser_fallback_url=${encodeURIComponent(url)};end`; };
+const DRINKS = [['beer', 'Beer'], ['wine', 'Wine'], ['long', 'Long drink'], ['shot', 'Shot']];
+const GLASS_ML = 250; // one tap on Water is one glass
+const drinkTotal = r => DRINKS.reduce((n, [k]) => n + ((r.drinks || {})[k] || 0), 0);
+const drank = r => !!(r && (r.alcohol || drinkTotal(r) > 0));
+const MOODS = [['😞', 'Rough'], ['🙁', 'Meh'], ['😐', 'Okay'], ['🙂', 'Good'], ['😄', 'Great']];
+const BASE_TAGS = ['Work', 'Social', 'Family', 'Errands', 'Learning', 'Rest', 'Travel', 'Outdoors', 'Creative'];
+const SPORT_TAGS = ['Run', 'Walk', 'Gym', 'Golf 9', 'Golf 18', 'Golf Indoor', 'Tennis', 'Padel'];
+const isSport = r => (r.tags || []).some(t => t === 'Sport' || SPORT_TAGS.includes(t)); // 'Sport' kept so older entries still count
+const WORK_START = 9, WORK_END = 18; // window used to find your longest free block
+const HH = 52, LW = 46; // timeline: pixels per hour, width of the hour labels
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+function ymd(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function parseYmd(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+function addDays(s, n) { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); }
+const today = () => ymd(new Date());
+function weekStart(s) { return addDays(s, -((parseYmd(s).getDay() + 6) % 7)); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function fmt(n) { return Math.round(n).toLocaleString(); }
+function dur(min) { const h = Math.floor(min / 60), m = Math.round(min % 60); return h ? `${h}h ${String(m).padStart(2, '0')}m` : `${m}m`; }
+const timeStr = iso => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+function dayLabel(s) {
+  const t = today();
+  if (s === t) return 'Today'; if (s === addDays(t, 1)) return 'Tomorrow'; if (s === addDays(t, -1)) return 'Yesterday';
+  return parseYmd(s).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+}
+const longDate = s => parseYmd(s).toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' });
+const shortDate = s => parseYmd(s).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+const evKey = e => `${e.uid}|${e.start}`;
+const dueDay = t => (t.due ? t.due.slice(0, 10) : null);
+const hasTime = t => !!t.due && t.due.includes('T');
+const linkify = s => esc(s).replace(/(https?:\/\/[^\s<]+[^\s<.,;:!?)\]])/g, '<a href="$1" target="_blank" rel="noopener">$1</a>');
+const minutesIn = (date, iso) => (Date.parse(iso) - parseYmd(date).getTime()) / 6e4; // minutes since midnight of `date`
+const hm = m => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(Math.round(m % 60)).padStart(2, '0')}`;
+function untilStr(ms) { const m = Math.max(1, Math.round(ms / 6e4)); return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`; }
+function ago(d) {
+  const n = Math.round((Date.now() - Date.parse(d)) / 864e5);
+  return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n < 14 ? `${n} days ago` : n < 60 ? `${Math.round(n / 7)} weeks ago` : `${Math.round(n / 30)} months ago`;
+}
+function mailTime(ms) {
+  const d = new Date(ms);
+  return ymd(d) === today() ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : d.toLocaleDateString([], { day: 'numeric', month: 'short' });
+}
+
+/* ---------- state ---------- */
+function blank() { return { reviews: {}, prep: {}, health: {}, cache: {}, tasks: null, inbox: null, tags: [], crypto: { holdings: [], quotes: {}, at: 0 }, settings: { baseUrl: '', appKey: '', theme: 'dark', hideBalances: false, weekDays: 7 }, status: {}, healthAt: 0, demo: false }; }
+function load() {
+  try { const o = JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); const s = Object.assign(blank(), o); s.settings = Object.assign(blank().settings, o.settings); return s; }
+  catch { return blank(); }
+}
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); }
+  catch { toast('Could not save: browser storage is full or blocked.'); }
+}
+let S = load();
+let view = 'today';
+let viewDate = today();
+let reviewDate = addDays(today(), -1); // the review is about the previous day, so the steps and calendar are complete
+let lastToday = today();
+// A phone app can stay open past midnight: move "today" along so the Day tab does not keep showing yesterday.
+function rollDay() {
+  const t = today();
+  if (t === lastToday) return false;
+  if (viewDate === lastToday) { viewDate = t; didScroll = false; }
+  lastToday = t; return true;
+}
+let sbMsg = null, sbList = null;
+async function sbRefresh(quiet) {
+  if (!SharedBackup.configured()) { sbList = null; return; }
+  try { sbList = await SharedBackup.list(); if (!quiet) sbMsg = { ok: true, text: 'Connected.' }; } catch (e) { sbList = null; sbMsg = { ok: false, text: e.message }; }
+  if (view === 'settings') render();
+}
+let histDays = 30, mailFilter = 'all', loading = false, didScroll = false;
+
+function applyTheme() {
+  const t = ['dark', 'light', 'auto'].includes(S.settings.theme) ? S.settings.theme : 'dark';
+  document.documentElement.dataset.theme = t;
+  const light = t === 'light' || (t === 'auto' && window.matchMedia && matchMedia('(prefers-color-scheme: light)').matches);
+  $('themeColor').setAttribute('content', light ? '#f4f4f5' : '#111113');
+}
+
+/* ---------- Worker access ---------- */
+function baseUrl() { const b = (S.settings.baseUrl || '').trim().replace(/\/$/, ''); return /^https?:\/\//.test(b) ? b : null; }
+async function api(path, opts = {}) {
+  const base = baseUrl();
+  if (base === null) throw new Error('Enter your Worker address in Settings first (it starts with https://).');
+  const headers = { ...(opts.headers || {}), 'X-App-Key': S.settings.appKey };
+  if (opts.body) headers['Content-Type'] = 'application/json';
+  const res = await fetch(base + path, { ...opts, headers });
+  let body = null;
+  try { body = await res.json(); } catch { /* non-JSON */ }
+  if (!res.ok) throw new Error((body && body.error) || `Server returned ${res.status}`);
+  return body;
+}
+const connected = () => !!(S.settings.appKey && baseUrl()) && !S.demo;
+const post = (path, b) => api(path, { method: 'POST', body: JSON.stringify(b) });
+
+// Load everything for one day. Each part can fail on its own; whatever worked is kept and the rest keeps its saved copy.
+async function loadDay(date) {
+  if (!connected()) return;
+  loading = true; if (view === 'today' || view === 'review') render();
+  const from = parseYmd(date).toISOString(), to = parseYmd(addDays(date, 1)).toISOString();
+  const [cal, tasks, health] = await Promise.allSettled([
+    api(`/api/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
+    api(`/api/tasks?date=${date}`),
+    api(`/api/days?from=${addDays(date, -1)}&to=${date}`),
+  ]);
+  const at = Date.now();
+  if (cal.status === 'fulfilled') {
+    S.cache[date] = { at, events: cal.value.events, calendars: cal.value.calendars, errors: cal.value.errors };
+    S.status.cal = { at, ok: true, message: cal.value.errors.length ? cal.value.errors.map(e => `${e.calendar}: ${e.message}`).join('\n') : '' };
+  } else S.status.cal = { at, ok: false, message: cal.reason.message };
+  if (tasks.status === 'fulfilled') {
+    const prev = S.tasks || { doneOn: {} };
+    S.tasks = { at, open: tasks.value.open, doneOn: { ...prev.doneOn, [date]: tasks.value.doneOn } };
+    S.status.tasks = { at, ok: true, message: '' };
+  } else S.status.tasks = { at, ok: false, message: tasks.reason.message };
+  if (health.status === 'fulfilled') { mergeHealth(health.value); S.status.health = { at, ok: !health.value.errors?.length, message: (health.value.errors || []).map(e => `${e.type}: ${e.message}`).join('\n') }; }
+  else S.status.health = { at, ok: false, message: health.reason.message };
+  for (const d of Object.keys(S.cache).sort().slice(0, -21)) delete S.cache[d]; // keep the 21 most recent days
+  loading = false; save(); render();
+}
+function mergeHealth(out) { for (const [d, v] of Object.entries(out.days || {})) S.health[d] = Object.assign(S.health[d] || {}, v); S.healthAt = Date.now(); }
+async function syncHealth(days) {
+  if (!connected()) return;
+  try { const to = today(); mergeHealth(await api(`/api/days?from=${addDays(to, -(days - 1))}&to=${to}`)); S.status.health = { at: Date.now(), ok: true, message: '' }; }
+  catch (e) { S.status.health = { at: Date.now(), ok: false, message: e.message }; }
+  save(); render();
+}
+async function loadInbox() {
+  if (!connected()) return;
+  try { const r = await api('/api/mail/inbox'); S.inbox = { at: Date.now(), account: r.account, unread: r.unread, messages: r.messages }; S.status.mail = { at: Date.now(), ok: true, message: '' }; }
+  catch (e) { S.status.mail = { at: Date.now(), ok: false, message: e.message }; }
+  save(); render();
+}
+
+/* ---------- day shape ---------- */
+function dayShape(events, date) {
+  const timed = events.filter(e => !e.allDay);
+  if (!timed.length) return null;
+  const lo = parseYmd(date).getTime() + WORK_START * 36e5, hi = parseYmd(date).getTime() + WORK_END * 36e5;
+  const iv = timed.filter(e => e.busy).map(e => [Math.max(lo, Date.parse(e.start)), Math.min(hi, Date.parse(e.end))]).filter(([a, b]) => b > a).sort((a, b) => a[0] - b[0]);
+  const merged = [];
+  for (const x of iv) { if (merged.length && x[0] <= merged.at(-1)[1]) merged.at(-1)[1] = Math.max(merged.at(-1)[1], x[1]); else merged.push([...x]); }
+  let best = null, cur = lo;
+  for (const [a, b] of [...merged, [hi, hi]]) { if (a - cur > (best ? best[1] - best[0] : 0)) best = [cur, a]; cur = Math.max(cur, b); }
+  const mins = timed.filter(e => e.busy).reduce((a, e) => a + (Date.parse(e.end) - Date.parse(e.start)) / 6e4, 0);
+  return { count: timed.length, mins, free: best && best[1] - best[0] >= 30 * 6e4 ? best : null };
+}
+
+/* ---------- rendering ---------- */
+const NAV = [['today', 'Day', '▦'], ['inbox', 'Inbox', '✉'], ['review', 'Review', '☺'], ['more', 'More', '≡']];
+function render() {
+  const active = { history: 'more', settings: 'more', portfolio: 'more' }[view] || view, unread = S.inbox ? S.inbox.unread : 0;
+  $('nav').innerHTML = NAV.map(([k, l, ic]) => `<button data-v="${k}" class="${active === k ? 'on' : ''}"><i>${ic}</i>${l}${k === 'inbox' && unread ? `<span class="nb">${unread > 99 ? '99+' : unread}</span>` : ''}</button>`).join('');
+  $('nav').querySelectorAll('button').forEach(b => b.onclick = () => go(b.dataset.v));
+  $('fabslot').innerHTML = view === 'today' ? '<button class="fab" data-act="fab" aria-label="Add">+</button>' : '';
+  const app = $('app');
+  app.innerHTML = { today: dayHtml, inbox: inboxHtml, review: reviewHtml, more: moreHtml, history: historyHtml, settings: settingsHtml, portfolio: portfolioHtml }[view]();
+  bind(app); bind($('fabslot'));
+  if (slideDir && view === 'today') { app.classList.remove('slide-next', 'slide-prev'); void app.offsetWidth; app.classList.add('slide-' + slideDir); }
+  slideDir = '';
+  if (view === 'today' && viewDate === today() && !didScroll) {
+    const n = document.querySelector('.now');
+    if (n) { didScroll = true; window.scrollTo(0, Math.max(0, n.getBoundingClientRect().top + window.scrollY - 260)); }
+  }
+}
+let slideDir = '';
+function changeDay(delta) {
+  viewDate = addDays(viewDate, delta); slideDir = delta > 0 ? 'next' : 'prev';
+  render(); window.scrollTo(0, 0); loadDay(viewDate);
+}
+function go(v) {
+  if (v === 'review' && view !== 'review') reviewDate = addDays(today(), -1); // each visit starts on the previous day; use › for today
+  view = v; render(); window.scrollTo(0, 0);
+  if (v === 'review') loadDay(reviewDate);
+  if (v === 'today') loadDay(viewDate);
+  if (v === 'inbox') loadInbox();
+}
+function pill(extra = '') {
+  let p;
+  if (S.demo) p = `<span class="pill">Demo data</span>`;
+  else if (!connected()) p = `<button class="pill" data-act="goto-settings">Not connected</button>`;
+  else if (loading) p = `<span class="pill">Updating…</span>`;
+  else {
+    const bad = ['cal', 'tasks', 'health', 'mail'].filter(k => S.status[k] && !S.status[k].ok);
+    const at = Math.max(0, ...['cal', 'tasks'].map(k => (S.status[k] || {}).at || 0));
+    p = bad.length ? `<button class="pill bad" data-act="goto-settings">${bad.length} problem${bad.length > 1 ? 's' : ''} · details</button>`
+      : `<button class="pill" data-act="refresh">${at ? 'Updated ' + new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Refresh'}</button>`;
+  }
+  return `<span class="pills">${extra}${p}</span>`;
+}
+
+/* ----- day (timeline) ----- */
+function weekHtml(date) {
+  const mon = weekStart(date), t = today(), dow = parseYmd(date).getDay();
+  const n = S.settings.weekDays === 5 && dow >= 1 && dow <= 5 ? 5 : 7; // a weekend day always shows the full week so it stays visible
+  const days = Array.from({ length: n }, (_, i) => addDays(mon, i));
+  return `<div class="wk"><button class="ar" data-act="wprev" aria-label="Previous week">‹</button>${days.map(d => `<button class="wd ${d === date ? 'on' : ''} ${d === t ? 'today' : ''}" data-day="${d}">${parseYmd(d).toLocaleDateString([], { weekday: 'narrow' })}<b>${parseYmd(d).getDate()}</b></button>`).join('')}<button class="ar" data-act="wnext" aria-label="Next week">›</button></div>`;
+}
+function healthLine(d) {
+  const h = S.health[d] || {};
+  const p = [h.sleepMinutes != null && `Slept ${dur(h.sleepMinutes)}`, h.restingHr != null && `resting ${Math.round(h.restingHr)} bpm`].filter(Boolean);
+  const tiles = (h.steps != null || h.caloriesOut != null) ? `<div class="vit num">${h.steps != null ? `<div><b>${fmt(h.steps)}</b><span>steps so far</span></div>` : ''}${h.caloriesOut != null ? `<div><b>${fmt(h.caloriesOut)}</b><span>kcal burned so far</span></div>` : ''}</div>` : '';
+  return tiles + (p.length ? `<p class="health">${p.join(' · ')}</p>` : '');
+}
+function bucketTasks(open, date) {
+  const t = today(), soonEnd = addDays(date, 3), b = { overdue: [], onDay: [], timed: [], waiting: [], progress: [], soon: [], nodate: [], later: 0 };
+  for (const x of open) {
+    const d = dueDay(x);
+    if (x.waiting) b.waiting.push(x);
+    else if (d === date && hasTime(x)) b.timed.push(x);
+    else if (d === date) b.onDay.push(x);
+    else if (d && d < date && date === t) b.overdue.push(x);
+    else if (x.status === 'In progress') b.progress.push(x);
+    else if (d && d > date && d <= soonEnd) b.soon.push(x);
+    else if (!d) b.nodate.push(x);
+    else if (d > date) b.later++;
+  }
+  return b;
+}
+function taskRow(t, done) {
+  const d = dueDay(t), meta = [d && d !== viewDate ? `due ${shortDate(d)}` : '', t.types.join(', '), t.crm ? 'CRM' : '', t.status === 'In progress' ? 'in progress' : ''].filter(Boolean).join(' · ');
+  return `<div class="task ${done ? 'done' : ''}"><button class="chk ${done ? 'on' : ''}" data-done="${t.id}" aria-label="${done ? 'Mark not done' : 'Mark done'}">✓</button>
+    <button class="tt" data-task="${t.id}"><span class="tn">${esc(t.title)}</span>${meta ? `<span class="sub">${esc(meta)}</span>` : ''}</button></div>`;
+}
+function trayHtml(date, b) {
+  const st = S.status.tasks, T = S.tasks;
+  if (!T) return `<div class="card"><h3>To-dos</h3><p class="empty">${connected() ? (loading ? 'Loading your tasks…' : st && !st.ok ? esc(st.message) : 'Nothing loaded yet.') : 'Connect in Settings to see your Notion tasks.'}</p><button class="addrow" data-act="add-task">+ Add task</button></div>`;
+  const grp = (label, list, cls = '') => list.length ? `<div class="grouphd ${cls}"><span>${label}</span><span>${list.length}</span></div>${list.map(t => taskRow(t)).join('')}` : '';
+  const top = b.overdue.length + b.onDay.length + b.timed.length, more = b.progress.length + b.soon.length + b.waiting.length + b.nodate.length;
+  const done = date === today() ? (T.doneOn[today()] || []) : [];
+  const open = S.settings.trayOpen !== false;
+  return `<details class="card tray" id="tray" ${open ? 'open' : ''}><summary><span>To-dos · ${top}${b.timed.length ? ` <span class="muted" style="font-weight:400;font-size:13px">(${b.timed.length} on the timeline)</span>` : ''}</span><button class="mini" data-act="add-task">+ Add</button></summary>
+    <div class="body">
+    ${grp('Overdue', b.overdue, 'bad')}${grp(date === today() ? 'Due today' : 'Due ' + dayLabel(date).toLowerCase(), b.onDay)}
+    ${top - b.timed.length ? '' : `<p class="empty">${b.timed.length ? 'Everything else is on the timeline below.' : 'Nothing due. Clear day.'}</p>`}
+    ${more + done.length ? `<details style="margin-top:8px"><summary class="muted" style="font-size:14px;cursor:pointer">${more ? `${more} more: in progress, soon, waiting, no date` : ''}${more && done.length ? ' · ' : ''}${done.length ? `${done.length} done today` : ''}</summary>${grp('In progress', b.progress)}${grp('Next three days', b.soon)}${grp('Waiting on others', b.waiting)}${grp('No date', b.nodate)}${done.length ? `<div class="grouphd"><span>Done today</span><span>${done.length}</span></div>${done.map(t => taskRow(t, true)).join('')}` : ''}</details>` : ''}
+    ${st && !st.ok ? `<div class="errbox">Could not refresh: ${esc(st.message)}</div>` : ''}</div></details>`;
+}
+// Side-by-side lanes for overlapping items.
+function layoutLanes(items) {
+  const sorted = items.slice().sort((a, b) => a.s - b.s || b.e - a.e), clusters = [];
+  let cur = null;
+  for (const it of sorted) {
+    if (!cur || it.s >= cur.end) { cur = { end: it.e, items: [], lanes: [] }; clusters.push(cur); }
+    cur.end = Math.max(cur.end, it.e);
+    let l = cur.lanes.findIndex(x => x <= it.s);
+    if (l < 0) { l = cur.lanes.length; cur.lanes.push(it.e); } else cur.lanes[l] = it.e;
+    it.lane = l; cur.items.push(it);
+  }
+  clusters.forEach(c => c.items.forEach(it => { it.n = c.lanes.length; }));
+  return sorted;
+}
+function timelineHtml(date, timed, tasks) {
+  const isToday = date === today(), now = Date.now(), nowM = (now - parseYmd(date).getTime()) / 6e4;
+  const items = [
+    ...timed.map(ev => { const s = Math.max(0, minutesIn(date, ev.start)); return { ev, s, e: Math.max(s + 15, Math.min(1440, minutesIn(date, ev.end))) }; }),
+    ...tasks.map(t => { const s = Math.max(0, minutesIn(date, t.due)); return { t, s, e: s + 30 }; }),
+  ];
+  let lo = 8, hi = 18;
+  for (const i of items) { lo = Math.min(lo, Math.floor(i.s / 60)); hi = Math.max(hi, Math.ceil(i.e / 60)); }
+  if (isToday) { lo = Math.min(lo, Math.floor(nowM / 60)); hi = Math.max(hi, Math.ceil(nowM / 60) + 1); }
+  lo = Math.max(0, Math.min(lo, 23)); hi = Math.min(24, Math.max(hi, lo + 1));
+  const y = m => (m - lo * 60) / 60 * HH, nextEv = isToday ? timed.find(e => Date.parse(e.end) > now) : null;
+  let html = '';
+  for (let h = lo; h <= hi; h++) html += `<div class="hl" style="top:${(h - lo) * HH}px"></div>${h < hi ? `<div class="hr" style="top:${(h - lo) * HH + 3}px">${String(h).padStart(2, '0')}:00</div>` : ''}`;
+  for (const it of layoutLanes(items)) {
+    const top = y(it.s), pos = `left:calc(${LW}px + (100% - ${LW}px) * ${it.lane} / ${it.n});width:calc((100% - ${LW}px) / ${it.n} - 4px);`;
+    if (it.ev) {
+      const e = it.ev, h = Math.max(24, y(it.e) - top - 2), tight = h < 40, past = isToday && Date.parse(e.end) <= now;
+      const sub = tight ? '' : `<span>${timeStr(e.start)}–${timeStr(e.end)}${e.location ? ' · ' + esc(e.location.split('\n')[0]) : ''}${e.attendeeCount > 1 ? ` · ${e.attendeeCount} people` : ''}</span>`;
+      html += `<button class="tev ${e.busy ? '' : 'n'} ${past ? 'past' : ''} ${nextEv === e ? 'next' : ''}" data-ev="${esc(evKey(e))}" style="top:${top}px;height:${h}px;${pos}"><b>${esc(e.title)}${tight ? ' · ' + timeStr(e.start) : ''}</b>${sub}</button>`;
+    } else {
+      const t = it.t;
+      html += `<div class="ttk" style="top:${top}px;height:30px;${pos}"><button class="chk" data-done="${t.id}" aria-label="Mark done">✓</button><button class="nm" data-task="${t.id}">${esc(t.title)} · ${hm(it.s)}</button></div>`;
+    }
+  }
+  if (isToday) html += `<div class="now" style="top:${y(nowM)}px"></div>`;
+  return `<div class="tl" data-start="${lo}" style="height:${(hi - lo) * HH}px">${html}</div>`;
+}
+function dayHtml() {
+  const d = viewDate, isToday = d === today(), c = S.cache[d], ev = c ? c.events : [], now = Date.now();
+  const timed = ev.filter(e => !e.allDay), allDay = ev.filter(e => e.allDay), upcoming = isToday ? timed.find(e => Date.parse(e.end) > now) : null;
+  const sub = isToday ? (upcoming ? (Date.parse(upcoming.start) <= now ? `Now: ${upcoming.title}` : `Next: ${upcoming.title} in ${untilStr(Date.parse(upcoming.start) - now)}`) : (timed.length ? 'Nothing more today' : 'No meetings today'))
+    : (timed.length ? `${timed.length} meeting${timed.length > 1 ? 's' : ''}` : 'No meetings');
+  const b = bucketTasks(S.tasks ? S.tasks.open : [], d), sh = c ? dayShape(ev, d) : null;
+  const y = addDays(today(), -1), needReview = isToday && !(S.reviews[y] && (S.reviews[y].mood || S.reviews[y].did)) && new Date().getHours() < 14;
+  const stale = S.status.cal && !S.status.cal.ok && c ? `<div class="errbox">Could not refresh the calendar: ${esc(S.status.cal.message)}<br>Showing the copy from ${new Date(c.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.</div>` : '';
+  const calMsg = !c ? `<p class="empty">${connected() ? (loading ? 'Loading your calendar…' : S.status.cal && !S.status.cal.ok ? esc(S.status.cal.message) : 'Nothing loaded yet.') : 'Connect Google in Settings to see your meetings.'}</p>` : '';
+  return `<div class="hd"><div><h1>${longDate(d)}</h1><div class="mu">${esc(sub)}</div></div>${pill(isToday ? '' : '<button class="pill" data-act="today">Today</button>')}</div>
+    ${weekHtml(d)}
+    <div class="stack">
+    ${needReview ? `<div class="nudge"><span><b>How was yesterday?</b><span class="muted" style="font-size:14px">30 seconds to log it.</span></span><button class="btn day" data-act="review-yesterday">Log it</button></div>` : ''}
+    ${isToday ? readinessCard(d) : ''}${isToday ? healthLine(d) : ''}${d <= today() ? trackCard(d) : ''}${isToday ? portfolioLine() : ''}
+    ${allDay.length ? `<div class="allday">${allDay.map(e => `<span>${esc(e.title)}</span>`).join('')}</div>` : ''}
+    ${trayHtml(d, b)}
+    ${sh ? `<p class="shape"><b>${sh.count} meeting${sh.count > 1 ? 's' : ''}</b> · ${dur(sh.mins)} booked${sh.free ? ` · longest free block <b>${timeStr(sh.free[0])}–${timeStr(sh.free[1])}</b>` : ''}</p>` : ''}
+    ${calMsg}${timelineHtml(d, timed, b.timed)}${stale}
+    ${c && c.errors && c.errors.length ? `<div class="errbox">Some calendars could not be read: ${esc(c.errors.map(e => e.calendar).join(', '))}</div>` : ''}
+    </div>`;
+}
+
+/* ----- readiness for training (1 to 10), from your own sleep, resting heart rate, HRV and recent load ----- */
+const median = a => { const s = a.slice().sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+// Your normal for a metric: the median of up to 28 earlier days, and how much it usually varies (robust spread, with a floor so tiny wobbles do not count).
+function baseline(metric, date, floor) {
+  const v = [];
+  for (let i = 1; i <= 28; i++) { const x = (S.health[addDays(date, -i)] || {})[metric]; if (typeof x === 'number') v.push(x); }
+  if (v.length < 7) return { n: v.length, ok: false };
+  const med = median(v), mad = median(v.map(x => Math.abs(x - med))) * 1.4826;
+  return { n: v.length, ok: true, med, sd: Math.max(mad, floor) };
+}
+const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+function readiness(date) {
+  const h = S.health[date] || {};
+  if (typeof h.sleepMinutes !== 'number') return { pending: true };
+  const parts = [];
+  // Sleep: nothing under 4 hours, full marks at 8, with a little credit for deep and REM making up around 40 percent of it.
+  const dScore = clamp((h.sleepMinutes - 240) / 240, 0, 1) * 100;
+  const stage = typeof h.sleepDeepMin === 'number' ? (h.sleepDeepMin + (h.sleepRemMin || 0)) / h.sleepMinutes : null;
+  parts.push({ k: 'sleep', name: 'Sleep', w: 0.35, pts: stage == null ? dScore : dScore * 0.8 + Math.min(1, stage / 0.4) * 20, text: `${dur(h.sleepMinutes)}${stage != null ? `, ${Math.round(stage * 100)}% deep and REM` : ''}`, hint: 'Full marks from 8 hours.' });
+  const bHrv = baseline('hrv', date, 3), bRhr = baseline('restingHr', date, 1.5);
+  if (typeof h.hrv === 'number' && bHrv.ok) { const z = (h.hrv - bHrv.med) / bHrv.sd; parts.push({ k: 'hrv', name: 'Heart rate variability', w: 0.25, pts: clamp(60 + 20 * z, 0, 100), text: `${Math.round(h.hrv)} ms, ${h.hrv >= bHrv.med ? '+' : '−'}${Math.abs(Math.round(h.hrv - bHrv.med))} vs your usual ${Math.round(bHrv.med)}`, hint: 'Higher than your normal is better.' }); }
+  if (typeof h.restingHr === 'number' && bRhr.ok) { const z = (h.restingHr - bRhr.med) / bRhr.sd; parts.push({ k: 'rhr', name: 'Resting heart rate', w: 0.25, pts: clamp(60 - 20 * z, 0, 100), text: `${Math.round(h.restingHr)} bpm, ${h.restingHr >= bRhr.med ? '+' : '−'}${Math.abs(Math.round(h.restingHr - bRhr.med))} vs your usual ${Math.round(bRhr.med)}`, hint: 'Lower than your normal is better.' }); }
+  // Recent load: the last two days of activity against your own 28-day average.
+  const load = [1, 2].map(i => (S.health[addDays(date, -i)] || {}).activeKcal).filter(x => typeof x === 'number'), bLoad = baseline('activeKcal', date, 50);
+  if (load.length && bLoad.ok) { const ratio = (load.reduce((a, b) => a + b, 0) / load.length) / bLoad.med; parts.push({ k: 'load', name: 'Recent training load', w: 0.15, pts: clamp(100 - (ratio - 0.7) * 100, 20, 100), text: ratio <= 0.85 ? 'lighter than usual' : ratio <= 1.15 ? 'about your usual' : `${Math.round((ratio - 1) * 100)}% above your usual`, hint: 'A heavy last two days lowers it.' }); }
+  const wSum = parts.reduce((a, p) => a + p.w, 0), base = parts.reduce((a, p) => a + p.w * p.pts, 0) / wSum;
+  // Body signals that look like the start of an illness cap the score.
+  const flags = [];
+  if (typeof h.skinTempDelta === 'number' && h.skinTempDelta >= 0.8) flags.push(`skin temperature ${h.skinTempDelta.toFixed(1)}°C above your normal`);
+  const bBr = baseline('breathingRate', date, 0.4);
+  if (typeof h.breathingRate === 'number' && bBr.ok && h.breathingRate - bBr.med >= 1.5) flags.push(`breathing rate up ${(h.breathingRate - bBr.med).toFixed(1)} per minute`);
+  const bOx = baseline('spo2', date, 0.5);
+  if (typeof h.spo2 === 'number' && bOx.ok && bOx.med - h.spo2 >= 2) flags.push(`blood oxygen ${(bOx.med - h.spo2).toFixed(1)} points below usual`);
+  // An average night with average vitals lands around 7. With only sleep to go on, it cannot claim more than 7.
+  let raw = 1 + 9 * clamp((base - 10) / 90, 0, 1);
+  if (parts.length < 3) raw = Math.min(raw, 7);
+  const ill = !!(S.reviews[date] || {}).ill; // you said you are ill or injured
+  const capped = (flags.length > 0 || ill) && raw > 5;
+  const score = clamp(Math.round(capped ? 5 : raw), 1, 10);
+  const label = score >= 8 ? 'Good to go hard' : score >= 6 ? 'Normal training' : score >= 4 ? 'Keep it light' : 'Rest or recover';
+  const missing = [!parts.some(p => p.k === 'hrv') && 'HRV', !parts.some(p => p.k === 'rhr') && 'resting heart rate', !parts.some(p => p.k === 'load') && 'training load'].filter(Boolean);
+  return { score, label, parts, flags, ill, capped, missing, base: Math.round(base), learning: Math.min(bHrv.n, bRhr.n) };
+}
+function readinessColor(sc) { return sc >= 8 ? 'var(--good)' : sc >= 6 ? 'var(--ink)' : sc >= 4 ? 'var(--warn)' : 'var(--danger)'; }
+function readinessCard(date) {
+  const r = readiness(date);
+  if (r.pending) return `<div class="rd" style="cursor:default"><span class="n muted">–<small>/10</small></span><span class="t"><b>Readiness for training</b><span>Waiting for last night's sleep data. Refresh after your watch has synced.</span></span></div>`;
+  const note = r.ill ? 'You marked yourself ill or injured, so it is held at 5.' : r.flags.length ? `Body signals look off: ${r.flags[0]}.` : r.missing.length ? `Based on ${r.parts.map(p => p.name.toLowerCase()).join(' and ')}.` : 'Sleep, HRV, resting heart rate and recent load.';
+  return `<button class="rd" data-act="readiness"><span class="n" style="color:${readinessColor(r.score)}">${r.score}<small>/10</small></span><span class="t"><b>${r.label}</b><span>${esc(note)}</span></span></button>`;
+}
+function openReadiness() {
+  const r = readiness(viewDate);
+  if (r.pending) return openSheet(`<h2>Readiness for training</h2><p class="muted">There is no sleep figure for ${esc(dayLabel(viewDate).toLowerCase())} yet. It appears once your watch has synced last night's sleep.</p><div class="row" style="margin-top:14px"><button class="btn day" id="rdOk">Close</button></div>`) || ($('rdOk').onclick = closeSheet);
+  openSheet(`<h2><span style="color:${readinessColor(r.score)}">${r.score}/10</span> · ${r.label}</h2>
+    <p class="muted" style="margin:2px 0 8px">${esc(longDate(viewDate))}. Each part is scored against your own normal over the last 28 days.</p>
+    ${r.ill ? `<div class="errbox">You marked ${esc(dayLabel(viewDate).toLowerCase())} as ill or injured, so the score is held at 5. Untick it on the day screen if that changes.</div>` : ''}
+    ${r.flags.length ? `<div class="errbox">${r.capped ? 'The score is held at 5 because ' : 'Worth watching: '}${esc(r.flags.join(', '))}. These can come before an illness. Treat today as a lighter day.</div>` : ''}
+    ${r.parts.map(p => `<div style="margin-top:12px"><div style="display:flex;justify-content:space-between;gap:8px"><b style="font-weight:600">${esc(p.name)}</b><span class="muted num">${Math.round(p.pts)} of 100 · ${Math.round(p.w / r.parts.reduce((a, q) => a + q.w, 0) * 100)}% of the score</span></div><div class="bar2"><i style="width:${Math.round(p.pts)}%"></i></div><div class="muted" style="font-size:13px;margin-top:3px">${esc(p.text)}. ${esc(p.hint)}</div></div>`).join('')}
+    ${r.missing.length ? `<p class="muted" style="font-size:13px;margin-top:14px">Not included yet: ${esc(r.missing.join(', '))}${r.learning < 7 ? `. Your baseline needs at least 7 days of data (you have ${r.learning}).` : '. No figure for it today.'}</p>` : ''}
+    <p class="muted" style="font-size:12px;margin-top:14px">A rule of thumb from your own numbers, not medical advice. If you feel unwell, listen to your body over this score.</p>
+    <div class="row" style="margin-top:14px"><button class="btn day" id="rdOk">Close</button></div>`);
+  $('rdOk').onclick = closeSheet;
+}
+
+/* ----- inbox ----- */
+const mailBodies = {}, mailOpen = new Set(); // mail text is kept in memory only, never saved on the phone
+function toggleMail(id) {
+  if (mailOpen.has(id)) mailOpen.delete(id);
+  else { mailOpen.add(id); if (!mailBodies[id] || mailBodies[id].error) loadMailBody(id); }
+  render();
+}
+async function loadMailBody(id) {
+  mailBodies[id] = { loading: true };
+  try { mailBodies[id] = S.demo ? demoMailBody(id) : await post('/api/mail/message', { id }); }
+  catch (e) { mailBodies[id] = { error: e.message }; }
+  if (view === 'inbox') render();
+}
+function demoMailBody(id) {
+  const t = { m1: 'Hi Matthias,\n\nThanks for sending this over. Can we move the kickoff to the week of the 16th? Legal wants one more look at the terms before we sign.\n\nBest,\nDana', m2: 'Your October statement is now available in online banking. Sign in to view it.', m3: 'Are you free around one on Thursday? Café Central again?\n\nTom' };
+  return { text: t[id] || 'Demo mail.', truncated: false, files: id === 'm1' ? [{ name: 'Terms v3.pdf', size: 2048 }] : [] };
+}
+const mailLink = m => `https://mail.google.com/mail/u/${encodeURIComponent((S.inbox && S.inbox.account) || '0')}/#inbox/${m.threadId}`;
+function inboxHtml() {
+  const I = S.inbox, st = S.status.mail, now = Date.now();
+  const f = { all: () => true, crm: m => !!m.crm, starred: m => m.starred, recent: m => now - m.at < 2 * 864e5 }[mailFilter];
+  const list = I ? I.messages.filter(f) : [];
+  const chips = [['all', 'All'], ['crm', 'From CRM'], ['starred', 'Starred'], ['recent', 'Last 2 days']];
+  return `<div class="hd"><div><h1>Inbox</h1><div class="mu">${I ? `${I.unread} unread in your main inbox${I.messages.length < I.unread ? ` · showing the latest ${I.messages.length}` : ''}` : ''}</div></div>${pill()}</div>
+    <div class="chips" style="margin-bottom:6px">${chips.map(([k, l]) => `<button class="chip ${mailFilter === k ? 'on' : ''}" data-mf="${k}">${l}</button>`).join('')}</div>
+    ${!I ? `<p class="empty">${connected() ? (st && !st.ok ? '' : 'Loading your inbox…') : 'Connect Google in Settings to see your unread mail.'}</p>` : ''}
+    ${st && !st.ok ? `<div class="errbox">${esc(st.message)}${I ? '<br>Showing the copy from ' + new Date(I.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.' : ''}</div>` : ''}
+    ${I && !list.length ? '<p class="empty">Nothing here. Inbox zero for this filter.</p>' : ''}
+    ${list.map(m => { const open = mailOpen.has(m.id), b = mailBodies[m.id]; return `<div class="mail ${open ? 'open' : ''}"><div class="mrow"><button class="mb" data-mopen="${esc(m.id)}" aria-expanded="${open}">
+      <div class="l1"><b>${esc(m.from.name)}${m.crm ? `<span class="badge day" style="color:var(--ink)">CRM${m.crm.tier ? ' ' + esc(m.crm.tier.split(' ')[0]) : ''}</span>` : ''}${m.starred ? ' ★' : ''}</b><span>${mailTime(m.at)}</span></div>
+      <div class="l2">${esc(m.subject)}</div><div class="l3">${esc(m.snippet)}</div></button>
+      <button class="mt" data-mtask="${esc(m.id)}" aria-label="Make a task from this mail">+ Task</button></div>
+      ${open ? `<div class="mexp">${!b || b.loading ? '<span class="muted">Loading the mail…</span>' : b.error ? `<div class="errbox" style="margin-top:0">${esc(b.error)}</div>`
+        : `<div class="mbody">${linkify(b.text)}</div>${b.truncated ? '<div class="muted" style="font-size:12px;margin-top:6px">Shortened. Open the mail in Gmail for the rest.</div>' : ''}${b.files && b.files.length ? `<div class="muted" style="font-size:12px;margin-top:6px">Attachments: ${esc(b.files.map(f => f.name).join(', '))}</div>` : ''}`}
+        <div class="mact"><a class="btn day" href="${esc(mailLink(m))}" target="_blank" rel="noopener">Open in Gmail</a><button class="btn" data-mopen="${esc(m.id)}">Close</button></div></div>` : ''}</div>`; }).join('')}
+    <p class="muted" style="font-size:12px;margin:12px 2px 0">Your main (Primary) inbox only: social, promotions and updates are left out. Tap a mail to read it here, or open it in Gmail. Reading here does not mark it as read in Gmail. My Day only reads your mail.</p>`;
+}
+
+/* ----- more / history ----- */
+function moreHtml() {
+  return `<div class="hd"><h1>More</h1>${pill()}</div>
+    <button class="menu" data-act="new-note-now"><i>＋</i><span>New meeting note<small>Creates it in your Notion Meetings database and opens it</small></span></button>
+    <a class="menu" href="${MEETINGS_DB_URL}" target="_blank" rel="noopener"><i>▤</i><span>Meetings database<small>Open in Notion</small></span></a>
+    <a class="menu" href="${TASKS_DB_URL}" target="_blank" rel="noopener"><i>☑</i><span>Task database<small>Open in Notion</small></span></a>
+    <a class="menu" href="${POCKET_CRM_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(POCKET_CRM_URL, POCKET_CRM_PACKAGE))}"><i>☎</i><span>Pocket CRM<small>Your contacts, people and next meetings</small></span></a>
+    <a class="menu" href="${LINKEDIN_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(LINKEDIN_URL, 'com.linkedin.android'))}"><i>in</i><span>LinkedIn<small>Opens the LinkedIn app</small></span></a>
+    <a class="menu" href="${RANKINGS_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(RANKINGS_URL, RANKINGS_PACKAGE))}"><i>🎾</i><span>Racket Rankings<small>Your tennis and padel results and rankings</small></span></a>
+    <a class="menu" href="${GYM_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(GYM_URL, GYM_PACKAGE))}"><i>🏋</i><span>Gym<small>Your workouts, programme and progress</small></span></a>
     <button class="menu" data-act="to-portfolio"><i>◔</i><span>Portfolio<small>${portfolioSubtitle()}</small></span></button>
     <button class="menu" data-act="to-history"><i>↗</i><span>History<small>Mood over time and patterns</small></span></button>
     <button class="menu" data-act="to-settings"><i>⚙</i><span>Settings<small>Connection, theme, backup</small></span></button>`;
