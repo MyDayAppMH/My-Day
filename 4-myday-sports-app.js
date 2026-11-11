@@ -1,6 +1,6 @@
 
 'use strict';
-const BUILD = '2026-11-11.sports5';
+const BUILD = '2026-11-11.sports6';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -531,7 +531,6 @@ function dayHtml() {
   const calMsg = !c ? `<p class="empty">${connected() ? (loading ? 'Loading your calendar…' : S.status.cal && !S.status.cal.ok ? esc(S.status.cal.message) : 'Nothing loaded yet.') : 'Connect Google in Settings to see your meetings.'}</p>` : '';
   return `<div class="hd"><div><h1>${longDate(d)}</h1><div class="mu">${esc(sub)}</div></div>${pill(isToday ? '' : '<button class="pill" data-act="today">Today</button>')}</div>
     ${weekHtml(d)}
-    <button class="menu" data-sw="connect-gym" style="width:100%;text-align:left"><i>🏋</i><span>Gym<small>Open Gym and connect calendar</small></span></button><p id="dayGymHandoff" class="muted" style="font-size:12px;margin:0">${esc(sessionStorage.getItem('myday.gym.handoff')||'')}</p>
     <div class="stack">
     ${needReview ? `<div class="nudge"><span><b>How was yesterday?</b><span class="muted" style="font-size:14px">30 seconds to log it.</span></span><button class="btn day" data-act="review-yesterday">Log it</button></div>` : ''}
     ${isToday ? readinessCard(d) : ''}${isToday ? healthLine(d) : ''}${d <= today() ? trackCard(d) : ''}${isToday ? portfolioLine() : ''}
