@@ -1,6 +1,6 @@
 
 'use strict';
-const BUILD = '2026-11-11.sports6';
+const BUILD = '2026-11-11.sports7';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -388,7 +388,7 @@ function dayShape(events, date) {
 }
 
 /* ---------- rendering ---------- */
-const NAV = [['today', 'Day', '▦'], ['sports', 'Sports', '◷'], ['inbox', 'Inbox', '✉'], ['review', 'Review', '☺'], ['more', 'More', '≡']];
+const NAV = [['today', 'Day', '▦'], ['sports', 'Sports', '◷'], ['review', 'Review', '☺'], ['more', 'More', '≡']];
 function render() {
   sportsSyncReview();
   const active = { history: 'more', settings: 'more', portfolio: 'more' }[view] || view, unread = S.inbox ? S.inbox.unread : 0;
