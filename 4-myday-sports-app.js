@@ -105,7 +105,7 @@ const sportsDay=iso=>!String(iso).includes('T')?String(iso).slice(0,10):new Intl
 function sportsPersist(){save();}
 function sportsWeek(){return S.sports.weeks[sportsDate]||null;}
 function sportOf(e){
- const t=String(e.title||'');
+ const t=String(e.title||'');if(/^Class · /i.test(t))return 'Class';
  if(/^(book|booking|reserve|reserva|deadline|remember|reminder)\b/i.test(t)||/Reserva Tenis|Green Fee/i.test(t))return '';
  if(/\b(gym|gimnasio)\b/i.test(t))return 'Gym';
  if(/\b(run|running|carrera)\b/i.test(t))return 'Run';
@@ -117,9 +117,9 @@ function sportsReconcile(events,at){
  for(const p of Object.values(S.sports.plans)){
   if(p.deleted)continue;
   const found=events.find(e=>(p.existingEvent?(e.id===p.event?.id):(e.description||'').includes(sportsMarker(p.id))));
-  if(found){p.event={id:found.id,uid:found.uid,start:found.start,link:found.link};p.confirmed=true;p.uncertain=false;p.canceled=false;p.actualDate=sportsDay(found.start);p.updatedAt=at;}
-  else if((p.confirmed||p.uncertain)&&p.actualDate>=sportsDate&&p.actualDate<addDays(sportsDate,7)){
-   p.confirmed=false;p.uncertain=true;p.canceled=true;p.updatedAt=at;
+  if(found){p.event={id:found.id,uid:found.uid,start:found.start,link:found.link};if(p.kind==='Class')p.calendarPlaced=true;else p.confirmed=true;p.uncertain=false;p.canceled=false;p.actualDate=sportsDay(found.start);p.updatedAt=at;}
+  else if((p.confirmed||p.calendarPlaced||p.uncertain)&&p.actualDate>=sportsDate&&p.actualDate<addDays(sportsDate,7)){
+   if(p.kind==='Class')p.calendarPlaced=false;else p.confirmed=false;p.uncertain=true;p.canceled=true;p.updatedAt=at;
   }
  }
 }
@@ -144,13 +144,13 @@ function sportsRows(){
   const date=found?sportsDay(found.start):p.confirmed?(p.actualDate||p.date):p.date;
   if(date<sportsDate||date>=addDays(sportsDate,7))continue;
   if(found)used.add(found.id||evKey(found));
-  rows.push({date,title:p.title,kind:p.kind,status:found||p.confirmed?(p.existingEvent&&['Tennis','Padel'].includes(p.kind)&&!/\b(Resultado|Result|Score):\s*\S/i.test(found?.description||'')?'Done · result pending':'Done'):p.uncertain?'Check calendar':p.canceled?'Canceled / plan kept':'Planned',p,event:found||p.event,time:found?timeStr(found.start):p.confirmed&&p.event?.start?timeStr(p.event.start):p.time||''});
+  rows.push({date,title:p.title,kind:p.kind,status:p.kind==='Class'?(p.attended?'Done':p.uncertain?'Check calendar':found||p.calendarPlaced?'Planned · in calendar':'Planned'):found||p.confirmed?(p.existingEvent&&['Tennis','Padel'].includes(p.kind)&&!/\b(Resultado|Result|Score):\s*\S/i.test(found?.description||'')?'Done · result pending':'Done'):p.uncertain?'Check calendar':p.canceled?'Canceled / plan kept':'Planned',p,event:found||p.event,time:found?timeStr(found.start):p.confirmed&&p.event?.start?timeStr(p.event.start):p.time||''});
  }
  for(const e of events){
   if(e.status==='cancelled'||e.response==='declined'||used.has(e.id||evKey(e)))continue;
   const kind=sportOf(e);if(!kind)continue;
   // User rule: gym/run entries confirm done on add. Match time alone never proves played.
-  const result=['Gym','Run'].includes(kind)||/\b(Resultado|Result|Score):\s*\S/i.test(e.description||'')||/\[(?:sports-source:gym\||myday-activity:)[^\]]+\]/.test(e.description||'');
+  const result=kind!=='Class'&&(['Gym','Run'].includes(kind)||/\b(Resultado|Result|Score):\s*\S/i.test(e.description||'')||/\[(?:sports-source:gym\||myday-activity:)[^\]]+\]/.test(e.description||''));
   const date=sportsDay(e.start);if(date<sportsDate||date>=addDays(sportsDate,7))continue;
   rows.push({date,title:e.title,kind,status:result?'Done':date<today()?'Confirm played':'Scheduled',event:e,time:e.allDay?'All day':timeStr(e.start)});
  }
@@ -160,13 +160,14 @@ function sportsHtml(){
  const week=sportsWeek(),rows=sportsRows(),plans=rows.filter(r=>!r.status.startsWith('Done')).length,done=rows.filter(r=>r.status.startsWith('Done')).length;
  return `<div class="top"><div><h1>Sports week</h1><p class="muted">${shortDate(sportsDate)} - ${shortDate(addDays(sportsDate,6))}</p></div></div>
  <div class="row swcontrols"><button class="btn" data-sw="prev" aria-label="Previous week">‹</button><button class="btn" data-sw="today">This week</button><button class="btn" data-sw="next" aria-label="Next week">›</button><button class="btn" data-sw="refresh" ${sportsBusy?'disabled':''}>${sportsBusy?'Updating…':'Refresh'}</button></div>
- <div class="row swsummary"><span class="pill">${done} done</span><span class="pill">${plans} planned / to confirm</span><button class="btn day" data-sw="new">+ Plan / activity</button></div>
+ <div class="row swsummary"><span class="pill">${done} done</span><span class="pill">${plans} planned / to confirm</span><button class="btn day" data-sw="new">+ Plan / activity</button></div><div class="row" style="margin-top:8px"><button class="btn" data-sw="new-class">+ Class</button></div>
  ${sportsError?`<div class="errbox">${esc(sportsError)} ${!connected()?'<button class="btn" data-act="goto-settings">Settings</button>':''}</div>`:''}
  <p class="muted swmeta">${week?'Calendar checked '+new Date(week.at).toLocaleString():'Calendar not loaded for this week.'} ${week&&Date.now()-week.at>3600000?'Saved copy, refresh to check changes.':''}</p>
- ${Array.from({length:7},(_,i)=>addDays(sportsDate,i)).map(date=>{const list=rows.filter(r=>r.date===date);return `<section class="card swday ${date===today()?'swtoday':''}"><h3>${esc(dayLabel(date))}${date===today()?' <span class="pill">today</span>':''}</h3>${list.map(r=>`<div class="swactivity"><div class="swline"><b>${esc(r.title)}</b><span class="swstate ${r.status.startsWith('Done')?'swdone':''}">${esc(r.status)}</span></div><div class="muted swmeta">${esc(r.kind)}${r.time?' · '+esc(r.time):''}${r.p?.target?' · '+esc(r.p.target):''}${r.p?.series?' · '+esc(r.p.series):''}</div><div class="row swbuttons">${r.p?`<button class="btn" data-sw="edit" data-id="${esc(r.p.id)}">${r.p.confirmed?'Details':'Edit / add to calendar'}</button>${r.p.kind==='Gym'&&!r.p.existingEvent?`<a class="btn" href="${GYM_URL+'?mydayActivity='+encodeURIComponent(r.p.id)}" target="_blank" rel="noopener">Open Gym</a>`:''}`:`<button class="btn" data-sw="confirm-event" data-id="${esc(r.event.id||evKey(r.event))}">${r.status.startsWith('Done')?'Result / details':r.status==='Confirm played'?(r.kind==='Tennis'||r.kind==='Padel'?'Played / result pending':'Confirm completed'):'Details'}</button>`}${r.event?.link?`<a class="btn" href="${esc(r.event.link)}" target="_blank" rel="noopener">Calendar</a>`:''}</div></div>`).join('')||'<p class="muted swmeta">Nothing planned or logged.</p>'}</section>`}).join('')}
- <p id="sportsGymHandoff" class="muted swmeta">${esc(sessionStorage.getItem('myday.gym.handoff')||'')}</p><div class="row"><button class="btn" data-sw="connect-gym">Connect Gym calendar</button><button class="btn" data-sw="import">Import training plan (CSV)</button></div><p class="muted swmeta">Gym and run plans stay here until you add them to your calendar. Adding confirms done, even before starting; cancel the calendar entry if you do not do it, then refresh here. Missing or moved entries are flagged for checking. Scheduled matches stay separate until a result or your played confirmation. Connect Gym once on this device for future saved workouts. Golf appears from calendar entries, not a live Golf feed yet. No pain tracking or extra scores.</p>`;
+ ${Array.from({length:7},(_,i)=>addDays(sportsDate,i)).map(date=>{const list=rows.filter(r=>r.date===date);return `<section class="card swday ${date===today()?'swtoday':''}"><h3>${esc(dayLabel(date))}${date===today()?' <span class="pill">today</span>':''}</h3>${list.map(r=>`<div class="swactivity"><div class="swline"><b>${esc(r.title)}</b><span class="swstate ${r.status.startsWith('Done')?'swdone':''}">${esc(r.status)}</span></div><div class="muted swmeta">${esc(r.kind)}${r.time?' · '+esc(r.time):''}${r.p?.target?' · '+esc(r.p.target):''}${r.p?.series?' · '+esc(r.p.series):''}</div><div class="row swbuttons">${r.p?`<button class="btn" data-sw="edit" data-id="${esc(r.p.id)}">${r.p.kind==='Class'?'Class details / attendance':r.p.confirmed?'Details':'Edit / add to calendar'}</button>${r.p.kind==='Gym'&&!r.p.existingEvent?`<a class="btn" href="${GYM_URL+'?mydayActivity='+encodeURIComponent(r.p.id)}" target="_blank" rel="noopener">Open Gym</a>`:''}`:`<button class="btn" data-sw="confirm-event" data-id="${esc(r.event.id||evKey(r.event))}">${r.status.startsWith('Done')?'Result / details':r.status==='Confirm played'?(r.kind==='Tennis'||r.kind==='Padel'?'Played / result pending':'Confirm completed'):'Details'}</button>`}${r.event?.link?`<a class="btn" href="${esc(r.event.link)}" target="_blank" rel="noopener">Calendar</a>`:''}</div></div>`).join('')||'<p class="muted swmeta">Nothing planned or logged.</p>'}</section>`}).join('')}
+ <div class="card"><h3>Metropolitan Abascal classes</h3><a class="btn" href="https://clubmetropolitan.com/club/madrid/abascal/" target="_blank" rel="noopener">Open live timetable</a><p class="muted swmeta">Opens Metropolitan's website separately. No automatic import or booking. Tell your assistant the sessions you want, or use + Class to enter a plan. Putting a class in Calendar keeps it planned until you confirm attendance.</p></div><p id="sportsGymHandoff" class="muted swmeta">${esc(sessionStorage.getItem('myday.gym.handoff')||'')}</p><div class="row"><button class="btn" data-sw="connect-gym">Connect Gym calendar</button><button class="btn" data-sw="import">Import training plan (CSV)</button></div><p class="muted swmeta">Gym and run plans stay here until you add them to your calendar. Adding confirms done, even before starting; cancel the calendar entry if you do not do it, then refresh here. Missing or moved entries are flagged for checking. Scheduled matches stay separate until a result or your played confirmation. Connect Gym once on this device for future saved workouts. Golf appears from calendar entries, not a live Golf feed yet. No pain tracking or extra scores.</p>`;
 }
 function sportsPlanForm(id){
+ if(id&&S.sports.plans[id]?.kind==='Class')return sportsClassForm(id);
  const p=id?S.sports.plans[id]:null,date=p?.date||today(),confirmed=!!p?.confirmed;
  openSheet(`<h2>${p?'Activity':'Plan / activity'}</h2>${confirmed?'<p class="muted">Confirmed done by your calendar add. To undo, cancel that calendar entry and refresh this week. The plan will stay.</p>':''}
  <label>Sport</label><select class="field" id="swKind">${sportsKinds.map(k=>`<option ${k===(p?.kind||'Gym')?'selected':''}>${k}</option>`).join('')}</select>
@@ -212,9 +213,37 @@ function sportsEventForm(id){
  const key='event:'+id,p=S.sports.plans[key],date=sportsDay(e.start),kind=sportOf(e),match=['Tennis','Padel'].includes(kind);
  openSheet(`<h2>${esc(e.title)}</h2><p>${esc(shortDate(date))} · ${esc(timeStr(e.start))}</p><p class="muted">${esc(e.description||'No result in this event yet.')}</p><p class="muted">Scheduled time alone does not mean played. If you played, confirm here without making another calendar entry. Official results should update the original event.</p><div class="row"><button class="btn day" id="swPlayed">${match?'Played · result pending':'Confirm completed'}</button>${p?'<button class="btn" id="swUnplayed">Undo played confirmation</button>':''}<button class="btn" id="swDone">Close</button></div>`);
  $('swDone').onclick=closeSheet;
- $('swPlayed').onclick=()=>{S.sports.plans[key]={id:key,title:e.title,kind,date,actualDate:date,confirmed:true,event:{id:e.id,uid:e.uid,start:e.start,link:e.link},existingEvent:true,updatedAt:Date.now()};save();closeSheet();render()};
+ $('swPlayed').onclick=()=>{if(kind==='Class'&&Date.parse(e.end||e.start)>Date.now())return toast('Confirm attendance only after the class has finished.');S.sports.plans[key]={id:key,title:e.title,kind,date,actualDate:date,confirmed:true,attended:kind==='Class',calendarPlaced:kind==='Class',time:timeStr(e.start),endTime:timeStr(e.end),event:{id:e.id,uid:e.uid,start:e.start,link:e.link},existingEvent:true,updatedAt:Date.now()};save();closeSheet();render()};
  if($('swUnplayed'))$('swUnplayed').onclick=()=>{S.sports.plans[key]={...p,deleted:true,updatedAt:Date.now()};save();closeSheet();render()};
 }
+
+function sportsClassForm(id){
+ const p=id?S.sports.plans[id]:null,locked=!!(p?.calendarPlaced||p?.uncertain||p?.attended);
+ openSheet(`<h2>Metropolitan class</h2><p class="muted">A private plan, not a reservation. Book on Metropolitan's website/app yourself. Classes are done only after you confirm attendance. Times are Madrid time.</p>
+ <label>Class name</label><input class="field" id="clName" maxlength="150" value="${esc(p?.title||'')}" ${locked?'disabled':''}>
+ <label>Day</label><input class="field" type="date" id="clDate" value="${esc(p?.date||today())}" ${locked?'disabled':''}>
+ <label>Start</label><input class="field" type="time" id="clStart" value="${esc(p?.time||'')}" ${locked?'disabled':''}>
+ <label>End</label><input class="field" type="time" id="clEnd" value="${esc(p?.endTime||'')}" ${locked?'disabled':''}>
+ <p class="muted">Metropolitan Abascal · no guests or invitations. Existing calendar entries must be changed in Calendar, not copied here.</p>
+ <div class="row" style="flex-wrap:wrap">${!locked?'<button class="btn" id="clSave">Save planned class</button><button class="btn day" id="clCal">Add to calendar · still planned</button>':''}${p&&!p.attended?'<button class="btn" id="clAttended">I attended this class</button>':''}${p?.attended?'<button class="btn" id="clUndo">Undo attendance</button>':''}${p?.event?.link?`<a class="btn" target="_blank" rel="noopener" href="${esc(p.event.link)}">Open Calendar</a>`:''}<button class="btn" id="clClose">Close</button></div>
+ ${p?.uncertain?'<p class="errbox">The calendar add or link is uncertain. Check Calendar before adding anything again. Your plan is kept.</p>':''}
+ ${p&&!p.calendarPlaced&&!p.uncertain?'<button class="btn" id="clRemove">Remove private plan</button>':''}`);
+ $('clClose').onclick=closeSheet;
+ const collect=()=>{const title=$('clName').value.trim(),date=$('clDate').value,time=$('clStart').value,endTime=$('clEnd').value;if(!title)throw Error('Enter the class name.');const start=sportsWall(date,time),end=sportsWall(date,endTime);if(isNaN(start)||isNaN(end)||end<=start)throw Error('Enter a valid day and an end after the start.');return{...p,id:p?.id||sportId(),kind:'Class',title,date,time,endTime,updatedAt:Date.now()}};
+ const store=n=>{S.sports.plans[n.id]=n;save();sportsDate=weekStart(n.date);closeSheet();render();return n};
+ if($('clSave'))$('clSave').onclick=()=>{try{store(collect())}catch(e){toast(e.message)}};
+ if($('clCal'))$('clCal').onclick=async()=>{
+  let n;try{n=collect()}catch(e){return toast(e.message)}
+  if(!connected()){store(n);return toast('Plan saved. Connect Google in MyDay Settings before adding to Calendar.')}
+  if(!confirm('Add this planned class to your main Google Calendar at Metropolitan Abascal? This does not book a place or confirm attendance.'))return;
+  $('clCal').disabled=true;n.uncertain=true;n.actualDate=n.date;S.sports.plans[n.id]=n;save();
+  try{const r=await post('/api/calendar/add',{title:'Class · '+n.title,start:sportsWall(n.date,n.time).toISOString(),end:sportsWall(n.date,n.endTime).toISOString(),timeZone:'Europe/Madrid',calendarId:'primary',guests:[],meet:false,location:'Metropolitan Abascal',description:'Planned class only. Booking and attendance are not confirmed.\n'+sportsMarker(n.id)});if(!r.event?.id)throw Error('Calendar did not return an event ID');n.event=r.event;n.calendarPlaced=true;n.uncertain=false;store(n);toast('Class in Calendar · still planned');await loadSportsWeek();}catch(e){store(n);sportsError='Class calendar add is uncertain: '+e.message+'. Check Calendar before retrying.';render()}
+ };
+ if($('clAttended'))$('clAttended').onclick=()=>{const end=sportsWall(p.date,p.endTime);if(isNaN(end)||end>Date.now())return toast('Confirm attendance only after the class has finished.');if(confirm('Confirm you actually attended this class?'))store({...p,attended:true,updatedAt:Date.now()})};
+ if($('clUndo'))$('clUndo').onclick=()=>store({...p,attended:false,updatedAt:Date.now()});
+ if($('clRemove'))$('clRemove').onclick=()=>{if(confirm('Remove this private class plan?'))store({...p,deleted:true,updatedAt:Date.now()})};
+}
+
 function sportsImport(){
  openSheet(`<h2>Import a training plan</h2><p class="muted">CSV with columns date,sport,title,target,time. Date is YYYY-MM-DD; sport is Gym or Run. This imports rough plans only, never calendar entries or completed activities. Use a plan you have chosen; no training prescription is generated here.</p><input id="swFile" type="file" accept=".csv,text/csv"><div id="swImportPreview"></div><button class="btn" id="swImportClose">Close</button>`);
  $('swImportClose').onclick=closeSheet;
@@ -251,7 +280,7 @@ window.addEventListener('message',e=>{
 document.addEventListener('click',e=>{const b=e.target.closest('[data-sw]');if(!b)return;const a=b.dataset.sw;
  if(a==='prev'||a==='next'){sportsDate=addDays(sportsDate,a==='prev'?-7:7);render();loadSportsWeek()}
  else if(a==='today'){sportsDate=weekStart(today());render();loadSportsWeek()}
- else if(a==='connect-gym')sportsConnectGym();else if(a==='refresh')loadSportsWeek();else if(a==='new')sportsPlanForm();else if(a==='edit')sportsPlanForm(b.dataset.id);else if(a==='confirm-event')sportsEventForm(b.dataset.id);else if(a==='import')sportsImport();
+ else if(a==='connect-gym')sportsConnectGym();else if(a==='refresh')loadSportsWeek();else if(a==='new')sportsPlanForm();else if(a==='new-class')sportsClassForm();else if(a==='edit')sportsPlanForm(b.dataset.id);else if(a==='confirm-event')sportsEventForm(b.dataset.id);else if(a==='import')sportsImport();
 });
 
 /* ---------- Worker access ---------- */
@@ -1434,7 +1463,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
 render();
 // Home-screen shortcuts (press and hold the app icon): ?new=task and ?new=event open the matching sheet straight away; ?new=review opens the Review tab.
 {
-  const q = new URLSearchParams(location.search).get('new');
+  const q = new URLSearchParams(location.search).get('new');if(q==='class'){history.replaceState(null,'',location.pathname);go('sports');sportsClassForm();}
   if (q === 'task' || q === 'event' || q === 'review') {
     history.replaceState(null, '', location.pathname + '?source=pwa'); // a refresh must not open it again
     if (q === 'review') { go('review'); }
