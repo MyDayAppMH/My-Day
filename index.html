@@ -228,7 +228,7 @@ svg text { fill: var(--muted); font-size: 10px; font-family: inherit; }
 
 <script>
 'use strict';
-const BUILD = '2026-11-11.sports1';
+const BUILD = '2026-11-11.sports2';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -377,8 +377,8 @@ function sportsRows(){
  for(const e of events){
   if(e.status==='cancelled'||e.response==='declined'||used.has(e.id||evKey(e)))continue;
   const kind=sportOf(e);if(!kind)continue;
-  // Calendar time alone never proves that an unlinked match or activity happened.
-  const result=/\b(Resultado|Result|Score):\s*\S/i.test(e.description||'')||/\[sports-source:gym\|[^\]]+\]/.test(e.description||'');
+  // User rule: gym/run entries confirm done on add. Match time alone never proves played.
+  const result=['Gym','Run'].includes(kind)||/\b(Resultado|Result|Score):\s*\S/i.test(e.description||'')||/\[(?:sports-source:gym\||myday-activity:)[^\]]+\]/.test(e.description||'');
   const date=sportsDay(e.start);if(date<sportsDate||date>=addDays(sportsDate,7))continue;
   rows.push({date,title:e.title,kind,status:result?'Done':date<today()?'Confirm played':'Scheduled',event:e,time:e.allDay?'All day':timeStr(e.start)});
  }
