@@ -1,6 +1,6 @@
 
 'use strict';
-const BUILD = '2026-11-12.layout2';
+const BUILD = '2026-11-12.layout3';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -418,6 +418,8 @@ const LAYOUT_STYLES = `<style>
 .showall{display:block;width:100%;background:none;border:0;color:var(--muted);font-size:14px;padding:10px 0;min-height:44px;text-align:left}
 .task .chk{position:relative}.task .chk::after{content:'';position:absolute;inset:-8px}.wk .ar{min-width:40px;min-height:40px}.mini{min-height:36px}
 .layout-more-grid .menu{gap:10px}.layout-more-grid .menu i{display:block;flex:none;width:24px;margin-top:1px;font-size:20px;line-height:1.1;font-style:normal;text-align:center}
+.layout-checkin summary{flex-wrap:wrap;row-gap:8px}.layout-checkin summary .ckline{order:1}.layout-checkin summary .layout-chevron{order:2;min-width:32px;text-align:center}.layout-checkin summary .ckbtns{order:3;flex:0 0 100%;display:flex;gap:12px}.ckbtn{flex:1 1 0;min-width:0;min-height:48px;border:1px solid var(--line);background:var(--card);border-radius:12px;font-size:15px;font-weight:600;padding:8px 10px}.layout-checkin summary .layout-water.ckbtn{flex:1 1 0;min-height:48px;padding:8px 10px;border:1px solid var(--line);background:var(--card)}
+.sm{min-width:52px;height:48px}.drow{gap:12px;padding:6px 2px}.tick{min-height:48px}.tick input{width:26px;height:26px}.cnt .big{min-height:56px}
 .lockbox{text-align:center;padding:30px 18px}.lockbox .big{font-size:38px}
 </style>`;
 let trayAll = false, dayCheckOpen = false, reviewDetailsOpen = false;
@@ -584,8 +586,8 @@ function dayHtml() {
 function dayCheckinHtml(d, needReview) {
   const r = readiness(d), entry = S.reviews[d] || {}, h = S.health[d] || {}, locked = lockedNow();
   // One line that is always visible: readiness, steps, calories burned and water. Tap it for the detail and the counters.
-  const line = [r.pending ? 'Readiness pending' : `Readiness ${r.score}/10`, h.steps != null ? `${fmt(h.steps)} steps` : '', h.caloriesOut != null ? `${fmt(h.caloriesOut)} kcal` : '', `💧 ${entry.water || 0}`].filter(Boolean).map(x => `<span style="white-space:nowrap">${esc(x)}</span>`).join(' · ');
-  return `<div class="card layout-checkin"><div class="layout-checkin-top"><div><b>Check-in</b>${needReview ? ' <span class="muted">Yesterday not logged</span>' : ''}</div>${needReview ? '<button class="layout-log" data-act="review-yesterday">Log it ›</button>' : ''}</div><details class="layout-checkin" id="dayCheckDetails" ${dayCheckOpen ? 'open' : ''}><summary><span class="muted">${line}</span><button class="layout-water" data-cnt data-date="${d}" data-key="water" data-by="1" aria-label="Add a glass of water">+💧</button><span class="layout-chevron">⌄</span></summary><div class="layout-checkin-content">${readinessCard(d)}${healthLine(d, false)}<div class="track" style="margin-top:8px">${trackHtml(d, false, locked)}</div></div></details></div>`;
+  const line = [r.pending ? 'Readiness pending' : `Readiness ${r.score}/10`, h.steps != null ? `${fmt(h.steps)} steps` : '', h.caloriesOut != null ? `${fmt(h.caloriesOut)} kcal` : '', `💧 ${entry.water || 0}`, drank(entry) ? `🍺 ${drinkTotal(entry)}` : ''].filter(Boolean).map(x => `<span style="white-space:nowrap">${esc(x)}</span>`).join(' · ');
+  return `<div class="card layout-checkin"><div class="layout-checkin-top"><div><b>Check-in</b>${needReview ? ' <span class="muted">Yesterday not logged</span>' : ''}</div>${needReview ? '<button class="layout-log" data-act="review-yesterday">Log it ›</button>' : ''}</div><details class="layout-checkin" id="dayCheckDetails" ${dayCheckOpen ? 'open' : ''}><summary><span class="muted ckline">${line}</span><span class="layout-chevron">⌄</span><span class="ckbtns"><button class="ckbtn layout-water" data-cnt data-date="${d}" data-key="water" data-by="1" aria-label="Add a glass of water">+ 💧 Water</button>${drank(entry) && !locked ? `<button class="ckbtn layout-beer" data-cnt data-date="${d}" data-key="beer" data-by="1" aria-label="Add a beer">+ 🍺 Beer</button>` : ''}</span></summary><div class="layout-checkin-content">${readinessCard(d)}${healthLine(d, false)}<div class="track" style="margin-top:8px">${trackHtml(d, false, locked)}</div></div></details></div>`;
 }
 /** The next meetings of today, so the day's shape is clear before the to-dos. */
 function nextUpHtml(d, timed) {
