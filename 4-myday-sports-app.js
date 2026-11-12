@@ -1,6 +1,6 @@
 
 'use strict';
-const BUILD = '2026-11-12.layout1';
+const BUILD = '2026-11-12.layout2';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -21,7 +21,7 @@ const GLASS_ML = 250; // one tap on Water is one glass
 const drinkTotal = r => DRINKS.reduce((n, [k]) => n + ((r.drinks || {})[k] || 0), 0);
 const drank = r => !!(r && (r.alcohol || drinkTotal(r) > 0));
 const MOODS = [['😞', 'Rough'], ['🙁', 'Meh'], ['😐', 'Okay'], ['🙂', 'Good'], ['😄', 'Great']];
-const BASE_TAGS = ['Work', 'Social', 'Family', 'Errands', 'Learning', 'Rest', 'Travel', 'Outdoors', 'Creative'];
+const BASE_TAGS = ['Work', 'Social', 'Family', 'Errands', 'Learning', 'Reading', 'Rest', 'Travel', 'Outdoors', 'Creative'];
 const SPORT_TAGS = ['Run', 'Walk', 'Gym', 'Golf 9', 'Golf 18', 'Golf Indoor', 'Tennis', 'Padel', 'Golf', 'Class'];
 const isSport = r => (r.tags || []).some(t => t === 'Sport' || SPORT_TAGS.includes(t)); // 'Sport' kept so older entries still count
 const WORK_START = 9, WORK_END = 18; // window used to find your longest free block
@@ -198,6 +198,7 @@ function sportsSyncReview(){
 function sportsHtml(){
  const week=sportsWeek(),rows=sportsRows(),plans=rows.filter(r=>!r.status.startsWith('Done')).length,done=rows.filter(r=>r.status.startsWith('Done')).length;
  return `<style>
+ .swday.swempty{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;min-height:0}.swday.swempty h3{margin:0;font-size:14px}.swday.swempty .swmeta{margin:0;font-size:13px}
  .swpage .swheader{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:8px 0 16px}.swpage h1{font-size:24px;line-height:1.2;margin:0;font-weight:650;letter-spacing:-.5px}.swpage .swheader .btn{min-height:40px;padding:8px 12px;font-size:12px;border-radius:12px;flex:none}.swpage .swperiod{display:grid;grid-template-columns:40px 1fr 40px;align-items:center;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:4px}.swpage .swperiod .btn{border:0;background:transparent;min-width:0;min-height:40px;padding:6px;font-size:22px}.swpage .swperiod .swperiodlabel{font-size:13px;font-weight:600;line-height:1.5;text-align:center}.swpage .swperiod .swperiodlabel small{display:block;font-size:11px;color:var(--muted);font-weight:400}.swpage .swsummary{display:flex;gap:8px;align-items:center;justify-content:space-between;margin:12px 0;color:var(--muted);font-size:12px}.swpage .swsummary b{color:var(--ink);font-weight:600}.swpage .swsummary .btn{flex:none;min-width:0;min-height:36px;padding:7px 10px;font-size:12px;border-radius:10px}.swpage .swadd{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 12px}.swpage .swadd .btn{min-height:42px;padding:9px 10px;font-size:13px;border-radius:12px}.swpage .swchecked{font-size:11px;margin:0 2px 14px}.swpage .swday{margin-bottom:12px;padding:12px 14px;border-radius:16px}.swpage .swday h3{font-size:13px;line-height:1.5;margin:0 0 8px;font-weight:600}.swpage .swtoday h3{color:var(--ink)}.swpage .swactivity{padding:12px 0}.swpage .swactivity:last-child{padding-bottom:0}.swpage .swline{gap:8px;align-items:start;flex-wrap:wrap}.swpage .swline b{font-size:14px;line-height:1.4;flex:1 1 165px;font-weight:600}.swpage .swstate{font-size:10px;line-height:1.5;max-width:100%;white-space:normal;border:0;background:var(--soft);padding:3px 7px;border-radius:7px}.swpage .swdone{color:var(--good)}.swpage .swmeta{font-size:12px;line-height:1.5;margin-top:4px}.swpage .swbuttons{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.swpage .swbuttons .btn{min-height:36px;padding:7px 9px;font-size:11px;border-radius:9px;background:transparent;flex:none}.swpage .swday>p{margin:4px 0}.swpage .swtools{margin-top:18px}.swpage .swtools .row{gap:8px}.swpage .swtools .btn{min-height:40px;padding:8px 10px;font-size:12px}.swpage .swtools>.card{margin-bottom:12px}
  </style><div class="swpage"><header class="swheader"><h1>Sports week</h1><button class="btn" data-sw="refresh" ${sportsBusy?'disabled':''}>${sportsBusy?'Updating…':'Refresh'}</button></header>
  <div class="swperiod"><button class="btn" data-sw="prev" aria-label="Previous week">‹</button><div class="swperiodlabel">${shortDate(sportsDate)} - ${shortDate(addDays(sportsDate,6))}<small>Your plans and completed activities</small></div><button class="btn" data-sw="next" aria-label="Next week">›</button></div>
@@ -205,7 +206,7 @@ function sportsHtml(){
  <div class="swadd"><button class="btn day" data-sw="new">+ Plan / activity</button><button class="btn" data-sw="new-class">+ Class</button></div>
  ${sportsError?`<div class="errbox">${esc(sportsError)} ${!connected()?'<button class="btn" data-act="goto-settings">Settings</button>':''}</div>`:''}
  <p class="muted swchecked">${week?'Calendar checked '+new Date(week.at).toLocaleString():'Calendar not loaded for this week.'} ${week&&Date.now()-week.at>3600000?'Saved copy, refresh to check changes.':''}</p>
- ${Array.from({length:7},(_,i)=>addDays(sportsDate,i)).map(date=>{const list=rows.filter(r=>r.date===date);return `<section class="card swday ${date===today()?'swtoday':''}"><h3>${esc(dayLabel(date))}</h3>${list.map(r=>`<div class="swactivity"><div class="swline"><b>${esc(r.title)}</b><span class="swstate ${r.status.startsWith('Done')?'swdone':''}">${esc(r.status)}</span></div><div class="muted swmeta">${esc(r.kind)}${r.time?' · '+esc(r.time):''}${r.p?.target?' · '+esc(r.p.target):''}${r.p?.series?' · '+esc(r.p.series):''}</div><div class="row swbuttons">${r.p?`<button class="btn" data-sw="edit" data-id="${esc(r.p.id)}">${r.p.kind==='Class'?'Class details / attendance':r.p.confirmed?'Details':'Edit / add to calendar'}</button>${r.p.kind==='Gym'&&!r.p.existingEvent?`<a class="btn" href="${GYM_URL+'?mydayActivity='+encodeURIComponent(r.p.id)}" target="_blank" rel="noopener">Open Gym</a>`:''}`:`<button class="btn" data-sw="confirm-event" data-id="${esc(r.event.id||evKey(r.event))}">${r.status.startsWith('Done')?'Result / details':r.status==='Confirm played'?(r.kind==='Tennis'||r.kind==='Padel'?'Played / result pending':'Confirm completed'):'Details'}</button>`}${r.event?.link?`<a class="btn" href="${esc(r.event.link)}" target="_blank" rel="noopener">Calendar</a>`:''}</div></div>`).join('')||'<p class="muted swmeta">Nothing planned or logged.</p>'}</section>`}).join('')}
+ ${Array.from({length:7},(_,i)=>addDays(sportsDate,i)).map(date=>{const list=rows.filter(r=>r.date===date);return `<section class="card swday ${date===today()?'swtoday':''} ${list.length?'':'swempty'}"><h3>${esc(dayLabel(date))}</h3>${list.map(r=>`<div class="swactivity"><div class="swline"><b>${esc(r.title)}</b><span class="swstate ${r.status.startsWith('Done')?'swdone':''}">${esc(r.status)}</span></div><div class="muted swmeta">${esc(r.kind)}${r.time?' · '+esc(r.time):''}${r.p?.target?' · '+esc(r.p.target):''}${r.p?.series?' · '+esc(r.p.series):''}</div><div class="row swbuttons">${r.p?`<button class="btn" data-sw="edit" data-id="${esc(r.p.id)}">${r.p.kind==='Class'?'Class details / attendance':r.p.confirmed?'Details':'Edit / add to calendar'}</button>${r.p.kind==='Gym'&&!r.p.existingEvent?`<a class="btn" href="${GYM_URL+'?mydayActivity='+encodeURIComponent(r.p.id)}" target="_blank" rel="noopener">Open Gym</a>`:''}`:`<button class="btn" data-sw="confirm-event" data-id="${esc(r.event.id||evKey(r.event))}">${r.status.startsWith('Done')?'Result / details':r.status==='Confirm played'?(r.kind==='Tennis'||r.kind==='Padel'?'Played / result pending':'Confirm completed'):'Details'}</button>`}${r.event?.link?`<a class="btn" href="${esc(r.event.link)}" target="_blank" rel="noopener">Calendar</a>`:''}</div></div>`).join('')||'<span class="muted swmeta">Nothing planned</span>'}</section>`}).join('')}
  <div class="swtools"><div class="card"><h3>Metropolitan Abascal classes</h3><a class="btn" href="https://clubmetropolitan.com/club/madrid/abascal/" target="_blank" rel="noopener">Open live timetable</a><p class="muted swmeta">Opens Metropolitan's website separately. No automatic import or booking. Tell your assistant the sessions you want, or use + Class to enter a plan. Putting a class in Calendar keeps it planned until you confirm attendance.</p></div><p id="sportsGymHandoff" class="muted swmeta">${esc(sessionStorage.getItem('myday.gym.handoff')||'')}</p><div class="row"><button class="btn" data-sw="connect-gym">Connect Gym calendar</button><button class="btn" data-sw="connect-golf">Connect Golf calendar</button><button class="btn" data-sw="import">Import training plan (CSV)</button></div><p class="muted swmeta">Gym and run plans stay here until you add them to your calendar. Adding confirms done, even before starting; cancel the calendar entry if you do not do it, then refresh here. Missing or moved entries are flagged for checking. Scheduled matches stay separate until a result or your played confirmation. Connect Gym once on this device for future saved workouts. Connect Golf once for future saved rounds. Past rounds are not backfilled; date/time mismatches and possible duplicate entries wait for your review. No pain tracking or extra scores.</p></div></div>`;
 }
 function sportsPlanForm(id){
@@ -387,8 +388,8 @@ async function syncHealth(days) {
   catch (e) { S.status.health = { at: Date.now(), ok: false, message: e.message }; }
   save(); render();
 }
-async function loadInbox() {
-  if (!connected()) return;
+async function loadInbox(force) {
+  if (!connected() || (!force && view !== 'inbox')) return; // there is no Inbox tab any more: do not fetch mail nobody can see
   try { const r = await api('/api/mail/inbox'); S.inbox = { at: Date.now(), account: r.account, unread: r.unread, messages: r.messages }; S.status.mail = { at: Date.now(), ok: true, message: '' }; }
   catch (e) { S.status.mail = { at: Date.now(), ok: false, message: e.message }; }
   save(); render();
@@ -411,9 +412,15 @@ function dayShape(events, date) {
 /* ---------- rendering ---------- */
 const NAV = [['today', 'Day', '▦'], ['sports', 'Sports', '◷'], ['review', 'Review', '☺'], ['more', 'More', '≡']];
 const LAYOUT_STYLES = `<style>
-.layout-checkin{padding:0;overflow:hidden}.layout-checkin-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px 0;font-size:13px}.layout-checkin-top .muted{font-size:12px;margin-left:5px}.layout-log{border:0;background:none;padding:8px 0 8px 8px;font-size:13px;white-space:nowrap}.layout-checkin summary{list-style:none;display:flex;align-items:center;gap:9px;min-height:48px;padding:8px 12px;cursor:pointer;font-size:13px}.layout-checkin summary::-webkit-details-marker,.layout-review-details summary::-webkit-details-marker{display:none}.layout-checkin summary .muted{flex:1;min-width:0}.layout-checkin summary .layout-water{font-size:13px;flex:none;min-height:36px;padding:4px 6px;border:0;background:transparent}.layout-checkin[open] .layout-chevron,.layout-review-details[open] .layout-chevron{transform:rotate(180deg)}.layout-checkin-content{padding:0 12px 12px;border-top:1px solid var(--line)}.layout-checkin-content .rd{margin-top:10px}.layout-checkin-content .track{margin-top:10px}.layout-review-details{padding:0}.layout-review-details summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:12px 14px;font-size:14px}.layout-review-details summary span{font-size:12px;color:var(--muted);text-align:right}.layout-review-details .layout-details-body{padding:0 14px 14px}.layout-review-note{font-size:12px;margin:8px 3px 0}.layout-review-core .field{width:100%;min-width:0}.layout-review-core textarea{min-height:100px}.layout-more-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.layout-more-grid .menu{margin:0;min-width:0;align-items:flex-start;padding:12px;min-height:76px}.layout-more-grid .menu i{display:none}.layout-more-grid .menu span{min-width:0;font-size:14px}.layout-more-grid .menu small{font-size:11px;line-height:1.4;margin-top:4px;overflow-wrap:anywhere}.layout-more h2{font-size:16px;margin:18px 2px 8px}.layout-more-group{padding:0 12px}.layout-more-group .menu{border:0;border-bottom:1px solid var(--line);border-radius:0;margin:0;padding:12px 2px;background:none}.layout-more-group .menu:last-child{border-bottom:0}.layout-more-group .menu i{display:none}.layout-more-group .menu span{font-size:14px}.layout-more-group .menu small{font-size:11px}.layout-top-settings{align-self:center;min-height:40px}.layout-review-core .saved{min-height:18px}
+.layout-checkin{padding:0;overflow:hidden}.layout-checkin-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px 0;font-size:13px}.layout-checkin-top .muted{font-size:12px;margin-left:5px}.layout-log{border:0;background:none;padding:8px 0 8px 8px;font-size:13px;white-space:nowrap}.layout-checkin summary{list-style:none;display:flex;align-items:center;gap:9px;min-height:48px;padding:8px 12px;cursor:pointer;font-size:13px}.layout-checkin summary::-webkit-details-marker,.layout-review-details summary::-webkit-details-marker{display:none}.layout-checkin summary .muted{flex:1;min-width:0}.layout-checkin summary .layout-water{font-size:13px;flex:none;min-height:36px;padding:4px 6px;border:0;background:transparent}.layout-checkin[open] .layout-chevron,.layout-review-details[open] .layout-chevron{transform:rotate(180deg)}.layout-checkin-content{padding:0 12px 12px;border-top:1px solid var(--line)}.layout-checkin-content .rd{margin-top:10px}.layout-checkin-content .track{margin-top:10px}.layout-review-details{padding:0}.layout-review-details summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:12px 14px;font-size:14px}.layout-review-details summary span{font-size:12px;color:var(--muted);text-align:right}.layout-review-details .layout-details-body{padding:0 14px 14px}.layout-review-note{font-size:12px;margin:8px 3px 0}.layout-review-core .field{width:100%;min-width:0}.layout-review-core textarea{min-height:100px}.layout-more-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.layout-more-grid .menu{margin:0;min-width:0;align-items:flex-start;padding:12px;min-height:76px}.layout-more-grid .menu span{min-width:0;font-size:14px}.layout-more-grid .menu small{font-size:11px;line-height:1.4;margin-top:4px;overflow-wrap:anywhere}.layout-more h2{font-size:16px;margin:18px 2px 8px}.layout-more-group{padding:0 12px}.layout-more-group .menu{border:0;border-bottom:1px solid var(--line);border-radius:0;margin:0;padding:12px 2px;background:none}.layout-more-group .menu:last-child{border-bottom:0}.layout-more-group .menu i{display:none}.layout-more-group .menu span{font-size:14px}.layout-more-group .menu small{font-size:11px}.layout-top-settings{align-self:center;min-height:40px}.layout-review-core .saved{min-height:18px}
+
+.nextup{padding:12px 14px}.nextup h3{margin:0 0 4px;font-size:15px}.nuw{display:flex;gap:12px;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line);padding:10px 0;min-height:48px}.nuw:first-of-type{border-top:0}.nut{flex:none;min-width:62px;white-space:nowrap;font-weight:650;font-size:14px}.nun{flex:1;min-width:0;font-size:15px;overflow-wrap:anywhere}.nun small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.showall{display:block;width:100%;background:none;border:0;color:var(--muted);font-size:14px;padding:10px 0;min-height:44px;text-align:left}
+.task .chk{position:relative}.task .chk::after{content:'';position:absolute;inset:-8px}.wk .ar{min-width:40px;min-height:40px}.mini{min-height:36px}
+.layout-more-grid .menu{gap:10px}.layout-more-grid .menu i{display:block;flex:none;width:24px;margin-top:1px;font-size:20px;line-height:1.1;font-style:normal;text-align:center}
+.lockbox{text-align:center;padding:30px 18px}.lockbox .big{font-size:38px}
 </style>`;
-let dayCheckOpen = false, reviewDetailsOpen = false;
+let trayAll = false, dayCheckOpen = false, reviewDetailsOpen = false;
 function render() {
   sportsSyncReview();
   const active = { history: 'more', settings: 'more', portfolio: 'more' }[view] || view, unread = S.inbox ? S.inbox.unread : 0;
@@ -421,7 +428,9 @@ function render() {
   $('nav').querySelectorAll('button').forEach(b => b.onclick = () => go(b.dataset.v));
   $('fabslot').innerHTML = view === 'today' ? '<button class="fab" data-act="fab" aria-label="Add">+</button>' : '';
   const app = $('app');
-  app.innerHTML = LAYOUT_STYLES + { today: dayHtml, inbox: inboxHtml, review: reviewHtml, more: moreHtml, history: historyHtml, settings: settingsHtml, portfolio: portfolioHtml, sports: sportsHtml }[view]();
+  const locked = viewLocked(view);
+  app.innerHTML = LAYOUT_STYLES + (locked ? lockScreenHtml(view) : { today: dayHtml, inbox: inboxHtml, review: reviewHtml, more: moreHtml, history: historyHtml, settings: settingsHtml, portfolio: portfolioHtml, sports: sportsHtml }[view]());
+  if (locked && lockTried !== view) { lockTried = view; setTimeout(lockUnlock, 50); } else if (!locked) lockTried = '';
   bind(app); bind($('fabslot'));
   if (slideDir && view === 'today') { app.classList.remove('slide-next', 'slide-prev'); void app.offsetWidth; app.classList.add('slide-' + slideDir); }
   slideDir = '';
@@ -464,10 +473,10 @@ function weekHtml(date) {
   const days = Array.from({ length: n }, (_, i) => addDays(mon, i));
   return `<div class="wk"><button class="ar" data-act="wprev" aria-label="Previous week">‹</button>${days.map(d => `<button class="wd ${d === date ? 'on' : ''} ${d === t ? 'today' : ''}" data-day="${d}">${parseYmd(d).toLocaleDateString([], { weekday: 'narrow' })}<b>${parseYmd(d).getDate()}</b></button>`).join('')}<button class="ar" data-act="wnext" aria-label="Next week">›</button></div>`;
 }
-function healthLine(d) {
+function healthLine(d, withTiles = true) {
   const h = S.health[d] || {};
   const p = [h.sleepMinutes != null && `Slept ${dur(h.sleepMinutes)}`, h.restingHr != null && `resting ${Math.round(h.restingHr)} bpm`].filter(Boolean);
-  const tiles = (h.steps != null || h.caloriesOut != null) ? `<div class="vit num">${h.steps != null ? `<div><b>${fmt(h.steps)}</b><span>steps so far</span></div>` : ''}${h.caloriesOut != null ? `<div><b>${fmt(h.caloriesOut)}</b><span>kcal burned so far</span></div>` : ''}</div>` : '';
+  const tiles = withTiles && (h.steps != null || h.caloriesOut != null) ? `<div class="vit num">${h.steps != null ? `<div><b>${fmt(h.steps)}</b><span>steps so far</span></div>` : ''}${h.caloriesOut != null ? `<div><b>${fmt(h.caloriesOut)}</b><span>kcal burned so far</span></div>` : ''}</div>` : '';
   return tiles + (p.length ? `<p class="health">${p.join(' · ')}</p>` : '');
 }
 function bucketTasks(open, date) {
@@ -493,13 +502,17 @@ function taskRow(t, done) {
 function trayHtml(date, b) {
   const st = S.status.tasks, T = S.tasks;
   if (!T) return `<div class="card"><h3>To-dos</h3><p class="empty">${connected() ? (loading ? 'Loading your tasks…' : st && !st.ok ? esc(st.message) : 'Nothing loaded yet.') : 'Connect in Settings to see your Notion tasks.'}</p><button class="addrow" data-act="add-task">+ Add task</button></div>`;
-  const grp = (label, list, cls = '') => list.length ? `<div class="grouphd ${cls}"><span>${label}</span><span>${list.length}</span></div>${list.map(t => taskRow(t)).join('')}` : '';
+  const grp = (label, list, cls = '', total = list.length) => list.length ? `<div class="grouphd ${cls}"><span>${label}</span><span>${total}</span></div>${list.map(t => taskRow(t)).join('')}` : '';
+  // At most five rows at first; the rest is one tap away.
+  let room = trayAll ? 1e9 : 5; const cap = list => { const part = list.slice(0, room); room -= part.length; return part; };
+  const hiddenN = trayAll ? 0 : Math.max(0, b.overdue.length + b.onDay.length - 5);
+  const overdueShow = cap(b.overdue), dueShow = cap(b.onDay);
   const top = b.overdue.length + b.onDay.length + b.timed.length, more = b.progress.length + b.soon.length + b.waiting.length + b.nodate.length;
   const done = date === today() ? (T.doneOn[today()] || []) : [];
   const open = S.settings.trayOpen !== false;
   return `<details class="card tray" id="tray" ${open ? 'open' : ''}><summary><span>To-dos · ${top}${b.timed.length ? ` <span class="muted" style="font-weight:400;font-size:13px">(${b.timed.length} on the timeline)</span>` : ''}</span><button class="mini" data-act="add-task">+ Add</button></summary>
     <div class="body">
-    ${grp('Overdue', b.overdue, 'bad')}${grp(date === today() ? 'Due today' : 'Due ' + dayLabel(date).toLowerCase(), b.onDay)}
+    ${grp('Overdue', overdueShow, 'bad', b.overdue.length)}${grp(date === today() ? 'Due today' : 'Due ' + dayLabel(date).toLowerCase(), dueShow, '', b.onDay.length)}${hiddenN ? `<button class="showall" data-act="tray-all">Show ${hiddenN} more ›</button>` : (trayAll && b.overdue.length + b.onDay.length > 5 ? '<button class="showall" data-act="tray-all">Show fewer</button>' : '')}
     ${top - b.timed.length ? '' : `<p class="empty">${b.timed.length ? 'Everything else is on the timeline below.' : 'Nothing due. Clear day.'}</p>`}
     ${more + done.length ? `<details style="margin-top:8px"><summary class="muted" style="font-size:14px;cursor:pointer">${more ? `${more} more: in progress, soon, waiting, no date` : ''}${more && done.length ? ' · ' : ''}${done.length ? `${done.length} done today` : ''}</summary>${grp('In progress', b.progress)}${grp('Next three days', b.soon)}${grp('Waiting on others', b.waiting)}${grp('No date', b.nodate)}${done.length ? `<div class="grouphd"><span>Done today</span><span>${done.length}</span></div>${done.map(t => taskRow(t, true)).join('')}` : ''}</details>` : ''}
     ${st && !st.ok ? `<div class="errbox">Could not refresh: ${esc(st.message)}</div>` : ''}</div></details>`;
@@ -559,6 +572,7 @@ function dayHtml() {
     <div class="stack">
     ${isToday ? dayCheckinHtml(d, needReview) : d <= today() ? trackCard(d) : ''}${isToday ? portfolioLine() : ''}
     ${allDay.length ? `<div class="allday">${allDay.map(e => `<span>${esc(e.title)}</span>`).join('')}</div>` : ''}
+    ${nextUpHtml(d, timed)}
     ${trayHtml(d, b)}
     <h2 style="font-size:16px;margin:12px 2px 8px">Agenda</h2>
     ${sh ? `<p class="shape"><b>${sh.count} meeting${sh.count > 1 ? 's' : ''}</b> · ${dur(sh.mins)} booked${sh.free ? ` · longest free block <b>${timeStr(sh.free[0])}–${timeStr(sh.free[1])}</b>` : ''}</p>` : ''}
@@ -568,9 +582,17 @@ function dayHtml() {
 }
 
 function dayCheckinHtml(d, needReview) {
-  const r = readiness(d), entry = S.reviews[d] || {};
-  const label = r.pending ? 'Readiness pending' : `Readiness ${r.score}/10`;
-  return `<div class="card layout-checkin"><div class="layout-checkin-top"><div><b>Check-in</b>${needReview ? ' <span class="muted">Yesterday not logged</span>' : ''}</div>${needReview ? '<button class="layout-log" data-act="review-yesterday">Log it ›</button>' : ''}</div><details class="layout-checkin" id="dayCheckDetails" ${dayCheckOpen ? 'open' : ''}><summary><span class="muted">${esc(label)} · Water ${entry.water || 0}</span><button class="layout-water" data-cnt data-date="${d}" data-key="water" data-by="1" aria-label="Add a glass of water">+ water</button><span class="layout-chevron">⌄</span></summary><div class="layout-checkin-content">${readinessCard(d)}${healthLine(d)}${trackCard(d)}</div></details></div>`;
+  const r = readiness(d), entry = S.reviews[d] || {}, h = S.health[d] || {}, locked = lockedNow();
+  // One line that is always visible: readiness, steps, calories burned and water. Tap it for the detail and the counters.
+  const line = [r.pending ? 'Readiness pending' : `Readiness ${r.score}/10`, h.steps != null ? `${fmt(h.steps)} steps` : '', h.caloriesOut != null ? `${fmt(h.caloriesOut)} kcal` : '', `💧 ${entry.water || 0}`].filter(Boolean).map(x => `<span style="white-space:nowrap">${esc(x)}</span>`).join(' · ');
+  return `<div class="card layout-checkin"><div class="layout-checkin-top"><div><b>Check-in</b>${needReview ? ' <span class="muted">Yesterday not logged</span>' : ''}</div>${needReview ? '<button class="layout-log" data-act="review-yesterday">Log it ›</button>' : ''}</div><details class="layout-checkin" id="dayCheckDetails" ${dayCheckOpen ? 'open' : ''}><summary><span class="muted">${line}</span><button class="layout-water" data-cnt data-date="${d}" data-key="water" data-by="1" aria-label="Add a glass of water">+💧</button><span class="layout-chevron">⌄</span></summary><div class="layout-checkin-content">${readinessCard(d)}${healthLine(d, false)}<div class="track" style="margin-top:8px">${trackHtml(d, false, locked)}</div></div></details></div>`;
+}
+/** The next meetings of today, so the day's shape is clear before the to-dos. */
+function nextUpHtml(d, timed) {
+  if (d !== today()) return '';
+  const now = Date.now(), list = timed.filter(e => Date.parse(e.end) > now).slice(0, 3);
+  if (!list.length) return '';
+  return `<div class="card nextup"><h3>Next up</h3>${list.map(e => { const live = Date.parse(e.start) <= now; return `<button class="nuw" data-ev="${esc(evKey(e))}"><span class="nut num">${live ? 'Now' : esc(timeStr(e.start))}</span><span class="nun">${esc(e.title)}${e.location ? `<small>${esc(e.location)}</small>` : e.video ? '<small>Video call</small>' : ''}</span></button>`; }).join('')}</div>`;
 }
 /* ----- readiness for training (1 to 10), from your own sleep, resting heart rate, HRV and recent load ----- */
 const median = a => { const s = a.slice().sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
@@ -680,10 +702,10 @@ function moreHtml() {
 <a class="menu" href="${LINKEDIN_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(LINKEDIN_URL, 'com.linkedin.android'))}"><i>in</i><span>LinkedIn<small>Opens the LinkedIn app</small></span></a>
 <a class="menu" href="${RANKINGS_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(RANKINGS_URL, RANKINGS_PACKAGE))}"><i>🎾</i><span>Racket Rankings<small>Your tennis and padel results and rankings</small></span></a>
 <a class="menu" href="${GYM_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(GYM_URL, GYM_PACKAGE))}"><i>🏋</i><span>Gym<small>Your workouts, programme and progress</small></span></a>
-    <a class="menu" href="${GOLF_URL}" target="_blank" rel="noopener"><span>GolfCaddie<small>Golf rounds</small></span></a>
-    <a class="menu" href="${LIBRARY_URL}" target="_blank" rel="noopener"><span>Library<small>Books and reading</small></span></a>
-    <a class="menu" href="${CALORIE_URL}" target="_blank" rel="noopener"><span>Calorie tracker<small>Food and nutrition</small></span></a>
-<button class="menu" data-act="to-portfolio"><i>◔</i><span>Portfolio<small>${portfolioSubtitle()}</small></span></button></div><h2>Notion</h2><div class="card layout-more-group"><button class="menu" data-act="new-note-now"><i>＋</i><span>New meeting note<small>Creates it in your Notion Meetings database and opens it</small></span></button><a class="menu" href="${MEETINGS_DB_URL}" target="_blank" rel="noopener"><i>▤</i><span>Meetings database<small>Open in Notion</small></span></a><a class="menu" href="${TASKS_DB_URL}" target="_blank" rel="noopener"><i>☑</i><span>Task database<small>Open in Notion</small></span></a></div><h2>MyDay</h2><div class="card layout-more-group"><button class="menu" data-act="to-history"><i>↗</i><span>History<small>Mood over time and patterns</small></span></button><button class="menu" data-act="to-settings"><i>⚙</i><span>Settings<small>Connection, theme, backup</small></span></button></div></div>`;
+    <a class="menu" href="${GOLF_URL}" target="_blank" rel="noopener"><i>⛳</i><span>GolfCaddie<small>Golf rounds</small></span></a>
+    <a class="menu" href="${LIBRARY_URL}" target="_blank" rel="noopener"><i>📚</i><span>Library<small>Books and reading</small></span></a>
+    <a class="menu" href="${CALORIE_URL}" target="_blank" rel="noopener"><i>🍎</i><span>Calorie tracker<small>Food and nutrition</small></span></a>
+<button class="menu" data-act="to-portfolio"><i>📈</i><span>Portfolio<small>${portfolioSubtitle()}</small></span></button></div><h2>Notion</h2><div class="card layout-more-group"><button class="menu" data-act="new-note-now"><i>＋</i><span>New meeting note<small>Creates it in your Notion Meetings database and opens it</small></span></button><a class="menu" href="${MEETINGS_DB_URL}" target="_blank" rel="noopener"><i>▤</i><span>Meetings database<small>Open in Notion</small></span></a><a class="menu" href="${TASKS_DB_URL}" target="_blank" rel="noopener"><i>☑</i><span>Task database<small>Open in Notion</small></span></a></div><h2>MyDay</h2><div class="card layout-more-group"><button class="menu" data-act="to-history"><i>↗</i><span>History<small>Mood over time and patterns</small></span></button><button class="menu" data-act="to-settings"><i>⚙</i><span>Settings<small>Connection, theme, backup</small></span></button></div></div>`;
 }
 function insightHtml(days) {
   const rows = days.map(d => ({ d, r: S.reviews[d], h: S.health[d] })).filter(x => x.r && x.r.mood);
@@ -807,16 +829,16 @@ const litres = n => (n * GLASS_ML / 1000).toFixed(2).replace(/\.?0+$/, '');
 /** The day screen's box: one slim line when closed (with a quick +1 glass), the full counters when open. It edits the same day entry the Review tab shows. */
 function trackCard(d) {
   const r = S.reviews[d] || {}, open = !!S.settings.trackOpen, w = r.water || 0, n = drinkTotal(r);
-  const sum = [w ? `💧 ${w}` : '', n ? `🍺 ${n}` : '', r.travel ? '✈ travelling' : '', r.ill ? '🤒 ill or injured' : ''].filter(Boolean).join(' · ') || 'Water, alcohol, travel, ill';
+  const lk = lockedNow(), sum = [w ? `💧 ${w}` : '', !lk && n ? `🍺 ${n}` : '', !lk && r.travel ? '✈ travelling' : '', !lk && r.ill ? '🤒 ill or injured' : ''].filter(Boolean).join(' · ') || 'Water, alcohol, travel, ill';
   return `<div class="card track"><div class="thead"><button class="tog" data-act="track-toggle" aria-expanded="${open}"><span>${d === today() ? '' : `<b>${esc(shortDate(d))}</b> · `}${esc(sum)}</span><i>${open ? '▴' : '▾'}</i></button>${open ? '' : `<button class="sm" data-cnt data-date="${d}" data-key="water" data-by="1" aria-label="Add a glass of water">+💧</button>`}</div>${open ? `<div style="margin-top:8px">${trackHtml(d, false)}</div>` : ''}</div>`;
 }
 /** Water counter, drink counters (only while "drinking alcohol" is ticked), travel and illness. Shared by the day screen and Review. */
-function trackHtml(date, withSex) {
+function trackHtml(date, withSex, locked = lockedNow()) {
   const r = S.reviews[date] || {}, w = r.water || 0, tick = (k, label) => `<label class="tick"><input type="checkbox" data-flag="${k}" data-date="${date}" ${r[k] ? 'checked' : ''}> ${label}</label>`;
   return `<div class="cnt"><button class="big" data-cnt data-date="${date}" data-key="water" data-by="1" aria-label="Add a glass of water"><span>💧 Water</span><b class="num">${w}</b><small>${w ? `${w === 1 ? 'glass' : 'glasses'} · ${litres(w)} L` : 'tap to add a glass'}</small></button>${w ? `<button class="sm" data-cnt data-date="${date}" data-key="water" data-by="-1" aria-label="Remove a glass">−</button>` : ''}</div>
-    ${tick('alcohol', 'Drinking alcohol')}
-    ${drank(r) ? DRINKS.map(([k, l]) => { const n = (r.drinks || {})[k] || 0; return `<div class="drow"><span>${l}</span><button class="sm" data-cnt data-date="${date}" data-key="${k}" data-by="-1" ${n ? '' : 'disabled'} aria-label="One less ${l}">−</button><b class="num">${n}</b><button class="sm" data-cnt data-date="${date}" data-key="${k}" data-by="1" aria-label="One more ${l}">+</button></div>`; }).join('') + `<div class="muted" style="font-size:12px;margin:2px 2px 6px">${drinkTotal(r)} drink${drinkTotal(r) === 1 ? '' : 's'} in total</div>` : ''}
-    ${tick('travel', 'Travelling')}${tick('ill', 'Ill or injured')}${withSex ? tick('sex', 'Had sex') : ''}`;
+    ${locked ? '<button class="btn" data-act="lock-unlock" style="margin-top:8px">🔒 Unlock for alcohol, travel and illness</button>' : ''}${locked ? '' : tick('alcohol', 'Drinking alcohol')}
+    ${!locked && drank(r) ? DRINKS.map(([k, l]) => { const n = (r.drinks || {})[k] || 0; return `<div class="drow"><span>${l}</span><button class="sm" data-cnt data-date="${date}" data-key="${k}" data-by="-1" ${n ? '' : 'disabled'} aria-label="One less ${l}">−</button><b class="num">${n}</b><button class="sm" data-cnt data-date="${date}" data-key="${k}" data-by="1" aria-label="One more ${l}">+</button></div>`; }).join('') + `<div class="muted" style="font-size:12px;margin:2px 2px 6px">${drinkTotal(r)} drink${drinkTotal(r) === 1 ? '' : 's'} in total</div>` : ''}
+    ${locked ? '' : tick('travel', 'Travelling') + tick('ill', 'Ill or injured') + (withSex ? tick('sex', 'Had sex') : '')}`;
 }
 function bindReview(root) {
   root.querySelectorAll('[data-mood]').forEach(b => b.onclick = () => { const v = +b.dataset.mood, cur = (S.reviews[reviewDate] || {}).mood; patchReview({ mood: cur === v ? null : v }); render(); });
@@ -865,7 +887,7 @@ function portfolioTotals() {
 }
 const chg = (c, arrow = true) => c == null ? '' : `<span class="${c < 0 ? 'down' : c > 0 ? 'up' : ''}">${arrow ? (c < 0 ? '▼ ' : c > 0 ? '▲ ' : '') : (c > 0 ? '+' : c < 0 ? '−' : '')}${Math.abs(c).toFixed(2)}%</span>`;
 function portfolioLine() {
-  if (!S.crypto.holdings.length || !S.crypto.at) return '';
+  if (!S.crypto.holdings.length || !S.crypto.at || lockedNow()) return '';
   const t = portfolioTotals();
   return `<button class="pline" data-act="to-portfolio">Portfolio <b>${hidden(usd(t.total, 0))}</b> · ${chg(t.pct, false)} in 24 h</button>`;
 }
@@ -1001,6 +1023,7 @@ function settingsHtml() {
     <div class="card"><h3>Your tags</h3>
       <p class="muted">Quick tags in the Review. Add your own from the Review tab; tap one of yours here to remove it.</p>
       <div class="chips">${[...SPORT_TAGS, ...BASE_TAGS].map(t => `<span class="chip">${esc(t)}</span>`).join('')}${S.tags.map(t => `<button class="chip on" data-tagdel="${esc(t)}">${esc(t)} ✕</button>`).join('')}</div></div>
+    ${lockSettingsHtml()}
     <div class="card"><h3>Shared backup (Notion)</h3>
       <p class="muted">Saves My Day, and your other apps, into the Notion database <b>App backups</b> through your Pocket CRM service. It backs up by itself once a day when you open the app.</p>
       <label class="lbl2" for="sbUrl">Pocket CRM address</label>
@@ -1260,8 +1283,8 @@ function bind(root) {
   root.querySelectorAll('[data-week-set]').forEach(b => b.onclick = () => { S.settings.weekDays = +b.dataset.weekSet; save(); render(); });
   root.querySelectorAll('[data-theme-set]').forEach(b => b.onclick = () => { S.settings.theme = b.dataset.themeSet; save(); applyTheme(); render(); });
   root.querySelectorAll('[data-act]').forEach(b => b.onclick = () => act(b.dataset.act));
-  if (view === 'review') bindReview(root);
-  if (view === 'settings') { const f = $('importFile'); if (f) f.onchange = importData; }
+  if (view === 'review' && !viewLocked(view)) bindReview(root);
+  if (view === 'settings') { const f = $('importFile'); if (f) f.onchange = importData; bindLock(); }
   const checkDetails = root.querySelector('#dayCheckDetails');
   if (checkDetails) checkDetails.ontoggle = () => { dayCheckOpen = checkDetails.open; };
   const optionalDetails = root.querySelector('#reviewDetails');
@@ -1285,6 +1308,10 @@ document.addEventListener('click', ev => {
 async function act(a) {
   if (a === 'wprev') { viewDate = addDays(viewDate, -7); render(); loadDay(viewDate); }
   else if (a === 'wnext') { viewDate = addDays(viewDate, 7); render(); loadDay(viewDate); }
+  else if (a === 'lock-unlock') lockUnlock();
+  else if (a === 'lock-now') lockNow();
+  else if (a === 'lock-reset') { if (confirm('This removes the lock from this phone. Your data is not touched. Continue?')) { lsDel(LOCK_CRED); lockOpen = true; lockMsg = ''; render(); } }
+  else if (a === 'tray-all') { trayAll = !trayAll; render(); }
   else if (a === 'track-toggle') { S.settings.trackOpen = !S.settings.trackOpen; save(); render(); }
   else if (a === 'today') { viewDate = today(); didScroll = false; render(); loadDay(viewDate); }
   else if (a === 'rprev') { reviewDate = addDays(reviewDate, -1); render(); loadDay(reviewDate); }
@@ -1373,6 +1400,70 @@ function toast(msg, label, fn) {
   if (label) $('toastBtn').onclick = () => { fn(); $('toast').innerHTML = ''; };
   toastTimer = setTimeout(() => { $('toast').innerHTML = ''; }, label ? 9000 : 3500);
 }
+
+
+/* ---------- fingerprint lock (Review, History, Portfolio and the private counters) ---------- */
+// The phone's own fingerprint or screen lock through WebAuthn. It keeps people who pick up your unlocked phone out of these screens;
+// it does not encrypt what the browser has stored. Kept outside the app data, so it is never part of a backup.
+const LOCK_CRED = 'myday.lock.cred', LOCK_MINS = 'myday.lock.mins', LOCKED_VIEWS = ['review', 'history', 'portfolio'];
+const lsGet = (k, d = '') => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* storage off */ } };
+const lsDel = k => { try { localStorage.removeItem(k); } catch { /* storage off */ } };
+let lockOpen = false, lockHiddenAt = 0, lockSupported = null, lockMsg = '', lockTried = '';
+const lockEnabled = () => !!lsGet(LOCK_CRED);
+const lockMinutes = () => { const n = Number(lsGet(LOCK_MINS, '5')); return Number.isFinite(n) && n >= 0 ? n : 5; };
+const lockedNow = () => lockEnabled() && !lockOpen;
+const viewLocked = v => lockedNow() && LOCKED_VIEWS.includes(v);
+const lockB64 = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const lockUnb64 = t => Uint8Array.from(atob(t.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+const lockRand = n => crypto.getRandomValues(new Uint8Array(n));
+async function lockCheckSupport() {
+  try { lockSupported = !!(window.PublicKeyCredential && navigator.credentials && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); } catch { lockSupported = false; }
+  if (view === 'settings') render();
+}
+async function lockRegister() {
+  const cred = await navigator.credentials.create({ publicKey: { challenge: lockRand(32), rp: { name: 'My Day', id: location.hostname }, user: { id: lockRand(16), name: 'my-day', displayName: 'My Day' }, pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }], authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'discouraged' }, timeout: 60000, attestation: 'none' } });
+  lsSet(LOCK_CRED, lockB64(cred.rawId));
+}
+/** Asks for the fingerprint (or the phone's PIN). Resolves true when it was given. */
+async function lockUnlock() {
+  if (!lockEnabled()) return true;
+  try {
+    await navigator.credentials.get({ publicKey: { challenge: lockRand(32), rpId: location.hostname, userVerification: 'required', timeout: 60000, allowCredentials: [{ type: 'public-key', id: lockUnb64(lsGet(LOCK_CRED)), transports: ['internal'] }] } });
+    lockOpen = true; lockMsg = ''; render();
+    return true;
+  } catch { lockMsg = 'Not unlocked yet. Tap Unlock to try again.'; if (viewLocked(view)) render(); return false; }
+}
+function lockNow() { if (!lockEnabled()) return; lockOpen = false; lockTried = ''; closeSheet(); render(); }
+const LOCK_NAMES = { review: 'Review', history: 'History', portfolio: 'Portfolio' };
+function lockScreenHtml(v) {
+  return `<div class="card lockbox"><div class="big">🔒</div><h2 style="margin:8px 0 4px">${LOCK_NAMES[v] || 'This screen'} is locked</h2><p class="muted" id="lockMsg">${esc(lockMsg || 'Touch the fingerprint sensor to open.')}</p><button class="btn day" data-act="lock-unlock">Unlock</button></div>`;
+}
+function lockSettingsHtml() {
+  const on = lockEnabled();
+  return `<div class="card"><h3>App lock</h3>
+      <label class="tick"><input type="checkbox" id="lockOn" ${on ? 'checked' : ''} ${lockSupported === false && !on ? 'disabled' : ''}> Lock Review, History and Portfolio with my fingerprint</label>
+      <p class="muted" style="font-size:12px;margin:2px 0 6px">${lockSupported === false && !on ? 'This phone has no fingerprint or screen lock that the app can use. Set one up in the phone\'s settings first.' : 'Also hides alcohol, travel and illness on the Day screen and the portfolio line. The Day, Sports and More screens stay open.'}</p>
+      ${on ? `<label class="lbl2" for="lockMins">Lock again after leaving the app for</label><select class="field" style="margin-top:0" id="lockMins">${[[0, 'At once'], [5, '5 minutes'], [15, '15 minutes'], [60, '1 hour']].map(([n, l]) => `<option value="${n}" ${lockMinutes() === n ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <div class="row" style="margin-top:8px;flex-wrap:wrap"><button class="btn" data-act="lock-now">🔒 Lock now</button><button class="btn" data-act="lock-reset">Can't unlock? Remove the lock</button></div>` : ''}
+      ${lockMsg && view === 'settings' ? `<p class="muted" style="font-size:13px;margin:6px 0 0">${esc(lockMsg)}</p>` : ''}</div>`;
+}
+function bindLock() {
+  const on = $('lockOn'); if (!on) return;
+  on.onchange = async () => {
+    lockMsg = '';
+    if (on.checked) { try { await lockRegister(); lockOpen = true; } catch (e) { lockMsg = e && e.name === 'NotAllowedError' ? 'Cancelled.' : 'The lock could not be set up on this phone.'; } }
+    else if (!lockOpen && !(await lockUnlock())) lockMsg = 'Unlock first to switch the lock off.';
+    else { lsDel(LOCK_CRED); lockOpen = true; }
+    render();
+  };
+  const m = $('lockMins'); if (m) m.onchange = () => lsSet(LOCK_MINS, m.value);
+}
+document.addEventListener('visibilitychange', () => {
+  if (!lockEnabled()) return;
+  if (document.visibilityState === 'hidden') { lockHiddenAt = Date.now(); return; }
+  if (lockOpen && lockHiddenAt && Date.now() - lockHiddenAt >= lockMinutes() * 60000) lockNow();
+});
 
 /* ---------- backup / demo / refresh ---------- */
 /* Shared backup client. The same code runs in My Day, Racket Rankings and Pocket CRM. Each app compresses its own data and
@@ -1538,6 +1629,7 @@ render();
     else setTimeout(() => { if (q === 'task') openAddTask(); else openEventForm({ date: today() }); }, 0);
   }
 }
+lockCheckSupport();
 SharedBackup.auto('myday', () => (Object.keys(S.reviews).length || Object.keys(S.sports.plans).length ? backupObject(!!S.settings.backupHoldings) : null));
 if (connected()) {
   loadDay(viewDate); loadInbox(); loadPrices();
