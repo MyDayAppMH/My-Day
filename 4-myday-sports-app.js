@@ -1539,3 +1539,5 @@ document.addEventListener('visibilitychange', () => {
 });
 setInterval(() => { if (view === 'portfolio' && !document.hidden && !$('overlay').innerHTML) loadPrices(); }, 5 * 60 * 1000); // keeps prices fresh while the page is open
 setInterval(() => { if (rollDay() && connected() && !$('overlay').innerHTML) loadDay(viewDate); if (view === 'today' && viewDate === today() && !$('overlay').innerHTML && !document.hidden) render(); }, 60 * 1000); // keeps the now-line and "next" label current
+
+// Republish verified Sports layout after a stalled hosting build.
