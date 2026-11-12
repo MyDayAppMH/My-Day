@@ -1,6 +1,6 @@
 
 'use strict';
-const BUILD = '2026-11-12.layout3';
+const BUILD = '2026-11-12.supps1';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -16,6 +16,12 @@ const GYM_URL = 'https://gymmh.github.io/gym-app/';
 const GYM_PACKAGE = 'org.chromium.webapk.a09d48c4912ac408f_v2'; // the installed Gym app (chrome://webapks lists it)
 const POCKET_CRM_PACKAGE = 'org.chromium.webapk.a5bf4b8d4443f6622_v2'; // the installed Pocket CRM app (Chrome's chrome://webapks lists it)
 const intentLink = (url, pkg) => { const u = new URL(url); return `intent://${u.host}${u.pathname}${u.search}${u.hash}#Intent;scheme=${u.protocol.replace(':', '')};action=android.intent.action.VIEW;${pkg ? `package=${pkg};` : ''}S.browser_fallback_url=${encodeURIComponent(url)};end`; };
+const DEFAULT_SUPPS = ['Omega 3', 'Curcuma', 'Magnesium', 'Vitamin D', 'Q10', 'Vitamin C', 'Longevity Mix'];
+const suppList = () => (Array.isArray(S.settings.supplements) && S.settings.supplements.length ? S.settings.supplements : DEFAULT_SUPPS);
+const suppsTaken = r => (r && Array.isArray(r.supps) ? r.supps : []);
+const suppAll = r => { const l = suppList(); return l.length > 0 && l.every(x => suppsTaken(r).includes(x)); };
+/** Consecutive days, ending on the given day, on which every supplement on your list was ticked. */
+function suppStreak(date) { let n = 0; for (let d = date; suppAll(S.reviews[d]); d = addDays(d, -1)) n++; return n; }
 const DRINKS = [['beer', 'Beer'], ['wine', 'Wine'], ['long', 'Long drink'], ['shot', 'Shot']];
 const GLASS_ML = 250; // one tap on Water is one glass
 const drinkTotal = r => DRINKS.reduce((n, [k]) => n + ((r.drinks || {})[k] || 0), 0);
@@ -420,6 +426,7 @@ const LAYOUT_STYLES = `<style>
 .layout-more-grid .menu{gap:10px}.layout-more-grid .menu i{display:block;flex:none;width:24px;margin-top:1px;font-size:20px;line-height:1.1;font-style:normal;text-align:center}
 .layout-checkin summary{flex-wrap:wrap;row-gap:8px}.layout-checkin summary .ckline{order:1}.layout-checkin summary .layout-chevron{order:2;min-width:32px;text-align:center}.layout-checkin summary .ckbtns{order:3;flex:0 0 100%;display:flex;gap:12px}.ckbtn{flex:1 1 0;min-width:0;min-height:48px;border:1px solid var(--line);background:var(--card);border-radius:12px;font-size:15px;font-weight:600;padding:8px 10px}.layout-checkin summary .layout-water.ckbtn{flex:1 1 0;min-height:48px;padding:8px 10px;border:1px solid var(--line);background:var(--card)}
 .sm{min-width:52px;height:48px}.drow{gap:12px;padding:6px 2px}.tick{min-height:48px}.tick input{width:26px;height:26px}.cnt .big{min-height:56px}
+.supps{padding:14px}.supphead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}.supphead h3{margin:0}.chip.sup{min-height:48px;padding:10px 16px;font-size:15px}.chips:has(.sup){gap:10px}.suppall{margin-top:12px;min-height:48px;width:100%}
 .lockbox{text-align:center;padding:30px 18px}.lockbox .big{font-size:38px}
 </style>`;
 let trayAll = false, dayCheckOpen = false, reviewDetailsOpen = false;
@@ -709,6 +716,12 @@ function moreHtml() {
     <a class="menu" href="${CALORIE_URL}" target="_blank" rel="noopener"><i>🍎</i><span>Calorie tracker<small>Food and nutrition</small></span></a>
 <button class="menu" data-act="to-portfolio"><i>📈</i><span>Portfolio<small>${portfolioSubtitle()}</small></span></button></div><h2>Notion</h2><div class="card layout-more-group"><button class="menu" data-act="new-note-now"><i>＋</i><span>New meeting note<small>Creates it in your Notion Meetings database and opens it</small></span></button><a class="menu" href="${MEETINGS_DB_URL}" target="_blank" rel="noopener"><i>▤</i><span>Meetings database<small>Open in Notion</small></span></a><a class="menu" href="${TASKS_DB_URL}" target="_blank" rel="noopener"><i>☑</i><span>Task database<small>Open in Notion</small></span></a></div><h2>MyDay</h2><div class="card layout-more-group"><button class="menu" data-act="to-history"><i>↗</i><span>History<small>Mood over time and patterns</small></span></button><button class="menu" data-act="to-settings"><i>⚙</i><span>Settings<small>Connection, theme, backup</small></span></button></div></div>`;
 }
+function suppHistoryHtml(days) {
+  const logged = days.filter(d => S.reviews[d]), list = suppList(), any = logged.some(d => suppsTaken(S.reviews[d]).length);
+  if (!any) return '';
+  const full = logged.filter(d => suppAll(S.reviews[d])).length;
+  return `<div class="card"><h3>Supplements</h3><div class="kv num">${list.map(t => `<span class="k">${esc(t)}</span><b>${logged.filter(d => suppsTaken(S.reviews[d]).includes(t)).length} of ${logged.length} days</b>`).join('')}<span class="k">All of them</span><b>${full} of ${logged.length} days</b></div></div>`;
+}
 function insightHtml(days) {
   const rows = days.map(d => ({ d, r: S.reviews[d], h: S.health[d] })).filter(x => x.r && x.r.mood);
   const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
@@ -718,6 +731,7 @@ function insightHtml(days) {
   const lines = [
     cmp('Sleep 7h or more', withSleep.filter(x => x.h.sleepMinutes >= 420), withSleep.filter(x => x.h.sleepMinutes < 420), '7h+ of sleep', 'less sleep'),
     cmp('Days with sport', rows.filter(x => isSport(x.r)), rows.filter(x => !isSport(x.r)), 'sport', 'no sport'),
+    cmp('All supplements taken', rows.filter(x => suppAll(x.r)), rows.filter(x => !suppAll(x.r)), 'all taken', 'not all'),
     cmp('Days with alcohol', rows.filter(x => drank(x.r)), rows.filter(x => !drank(x.r)), 'alcohol', 'no alcohol'),
     cmp('Days with 6+ glasses of water', rows.filter(x => (x.r.water || 0) >= 6), rows.filter(x => (x.r.water || 0) < 6), '6+ glasses', 'less water'),
     cmp('Travel days', rows.filter(x => x.r.travel), rows.filter(x => !x.r.travel), 'travelling', 'at home'),
@@ -759,6 +773,7 @@ function historyHtml() {
     <div class="seg">${[14, 30, 90].map(n => `<button data-hist="${n}" class="${histDays === n ? 'on' : ''}">${n} days</button>`).join('')}</div>
     <div class="card"><h3>Mood</h3>${moodChart(days)}<p class="muted" style="font-size:12px;margin:6px 0 0">${logged.length} of ${histDays} days logged. Gaps are days with no entry.</p></div>
     ${sportHtml(days)}
+    ${suppHistoryHtml(days)}
     ${insightHtml(days)}
     <div class="card"><h3>Your days</h3>${list || '<p class="empty">Nothing logged yet. Try the Review tab tomorrow morning.</p>'}</div></div>`;
 }
@@ -781,6 +796,12 @@ function factsHtml(date) {
     ${hb.length ? `<div class="muted" style="font-size:13px">Health</div><p style="margin:4px 0;font-size:14px">${hb.join(' · ')}</p>` : ''}
     ${timed.length || done.length ? `<button class="btn" style="margin-top:8px" data-act="fill-notes">Add meetings and tasks to my notes</button>` : ''}</div>`;
 }
+function suppCardHtml(date) {
+  const r = S.reviews[date] || {}, list = suppList(), got = suppsTaken(r).filter(x => list.includes(x)).length, all = suppAll(r), st = suppStreak(date);
+  return `<div class="card supps"><div class="supphead"><h3>Supplements</h3><span class="muted num">${got}/${list.length}${st >= 2 ? ` · 🔥 ${st} days in a row` : ''}</span></div>
+    <div class="chips">${list.map(t => `<button class="chip sup ${suppsTaken(r).includes(t) ? 'on' : ''}" data-supp="${esc(t)}" aria-pressed="${suppsTaken(r).includes(t)}">${esc(t)}</button>`).join('')}</div>
+    <button class="btn suppall" data-supp-all="${all ? 'clear' : 'all'}">${all ? 'Clear all' : 'Took all'}</button></div>`;
+}
 function reviewHtml() {
   const r = S.reviews[reviewDate] || {}, tags = [...BASE_TAGS, ...S.tags];
   return `${dateBar(reviewDate, 'rprev', 'rnext')}<div class="stack">
@@ -794,6 +815,7 @@ function reviewHtml() {
       <span class="lbl2">Best moment or one win</span>
       <input class="field" id="win" style="margin-top:0" value="${esc(r.win || '')}" placeholder="Optional">
       <div class="saved" id="saved">${r.updatedAt ? 'Saved ✓' : ''}</div></div>
+    ${suppCardHtml(reviewDate)}
     <details class="card layout-review-details" id="reviewDetails" ${reviewDetailsOpen ? 'open' : ''}><summary><b>Details</b><span>Tags, sport, water & more <i class="layout-chevron">⌄</i></span></summary><div class="layout-details-body">      <span class="lbl2">Sport</span><p class="muted" style="font-size:12px">Completed activities select their sport automatically on the activity day. Plans and class calendar holds do not.</p>
       <div class="chips">${SPORT_TAGS.map(t => `<button class="chip ${(r.tags || []).includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}</div>
       <span class="lbl2">What was it about?</span>
@@ -809,7 +831,7 @@ let saveTimer;
 function patchDay(date, patch) {
   const r = S.reviews[date] || (S.reviews[date] = {});
   Object.assign(r, patch, { updatedAt: Date.now() });
-  const empty = !r.mood && !r.energy && !r.alcohol && !r.sex && !r.travel && !r.ill && !r.water && !drinkTotal(r) && !(r.tags || []).length && !(r.did || '').trim() && !(r.win || '').trim();
+  const empty = !r.mood && !r.energy && !r.alcohol && !r.sex && !r.travel && !r.ill && !suppsTaken(r).length && !r.water && !drinkTotal(r) && !(r.tags || []).length && !(r.did || '').trim() && !(r.win || '').trim();
   if (empty) delete S.reviews[date];
   save();
 }
@@ -845,6 +867,8 @@ function trackHtml(date, withSex, locked = lockedNow()) {
 function bindReview(root) {
   root.querySelectorAll('[data-mood]').forEach(b => b.onclick = () => { const v = +b.dataset.mood, cur = (S.reviews[reviewDate] || {}).mood; patchReview({ mood: cur === v ? null : v }); render(); });
   root.querySelectorAll('[data-energy]').forEach(b => b.onclick = () => { const v = +b.dataset.energy, cur = (S.reviews[reviewDate] || {}).energy; patchReview({ energy: cur === v ? null : v }); render(); });
+  root.querySelectorAll('[data-supp]').forEach(b => b.onclick = () => { const t = b.dataset.supp, cur = suppsTaken(S.reviews[reviewDate]); patchReview({ supps: cur.includes(t) ? cur.filter(x => x !== t) : [...cur, t] }); render(); });
+  root.querySelectorAll('[data-supp-all]').forEach(b => b.onclick = () => { patchReview({ supps: b.dataset.suppAll === 'all' ? [...suppList()] : [] }); render(); });
   root.querySelectorAll('[data-tag]').forEach(b => b.onclick = () => {
     const t = b.dataset.tag, cur = (S.reviews[reviewDate] || {}).tags || [];if((S.reviews[reviewDate]?.sportsAutoTags||[]).includes(t))return toast('Selected from a completed activity. Change its completion in Sports to undo.');
     patchReview({ tags: cur.includes(t) ? cur.filter(x => x !== t) : [...cur, t] }); render();
@@ -1025,6 +1049,9 @@ function settingsHtml() {
     <div class="card"><h3>Your tags</h3>
       <p class="muted">Quick tags in the Review. Add your own from the Review tab; tap one of yours here to remove it.</p>
       <div class="chips">${[...SPORT_TAGS, ...BASE_TAGS].map(t => `<span class="chip">${esc(t)}</span>`).join('')}${S.tags.map(t => `<button class="chip on" data-tagdel="${esc(t)}">${esc(t)} ✕</button>`).join('')}</div></div>
+    <div class="card"><h3>Your supplements</h3>
+      <p class="muted">The list on the Review tab. Tap one to remove it from the list; the days you already ticked keep it.</p>
+      <div class="chips">${suppList().map(t => `<button class="chip on" data-suppdel="${esc(t)}">${esc(t)} ✕</button>`).join('')}<button class="chip" data-act="supp-add">+ add</button></div></div>
     ${lockSettingsHtml()}
     <div class="card"><h3>Shared backup (Notion)</h3>
       <p class="muted">Saves My Day, and your other apps, into the Notion database <b>App backups</b> through your Pocket CRM service. It backs up by itself once a day when you open the app.</p>
@@ -1281,6 +1308,7 @@ function bind(root) {
   root.querySelectorAll('[data-mtask]').forEach(b => b.onclick = () => openMailTask(b.dataset.mtask));
   root.querySelectorAll('[data-rev]').forEach(b => b.onclick = () => { reviewDate = b.dataset.rev; view = 'review'; render(); window.scrollTo(0, 0); loadDay(reviewDate); });
   root.querySelectorAll('[data-hist]').forEach(b => b.onclick = () => { histDays = +b.dataset.hist; render(); });
+  root.querySelectorAll('[data-suppdel]').forEach(b => b.onclick = () => { if (!confirm(`Remove ${b.dataset.suppdel} from your list?`)) return; S.settings.supplements = suppList().filter(x => x !== b.dataset.suppdel); save(); render(); });
   root.querySelectorAll('[data-tagdel]').forEach(b => b.onclick = () => { S.tags = S.tags.filter(t => t !== b.dataset.tagdel); save(); render(); });
   root.querySelectorAll('[data-week-set]').forEach(b => b.onclick = () => { S.settings.weekDays = +b.dataset.weekSet; save(); render(); });
   root.querySelectorAll('[data-theme-set]').forEach(b => b.onclick = () => { S.settings.theme = b.dataset.themeSet; save(); applyTheme(); render(); });
@@ -1310,6 +1338,7 @@ document.addEventListener('click', ev => {
 async function act(a) {
   if (a === 'wprev') { viewDate = addDays(viewDate, -7); render(); loadDay(viewDate); }
   else if (a === 'wnext') { viewDate = addDays(viewDate, 7); render(); loadDay(viewDate); }
+  else if (a === 'supp-add') { const t = (prompt('Supplement name') || '').trim().slice(0, 40); if (t && !suppList().some(x => x.toLowerCase() === t.toLowerCase())) { S.settings.supplements = [...suppList(), t]; save(); render(); } }
   else if (a === 'lock-unlock') lockUnlock();
   else if (a === 'lock-now') lockNow();
   else if (a === 'lock-reset') { if (confirm('This removes the lock from this phone. Your data is not touched. Continue?')) { lsDel(LOCK_CRED); lockOpen = true; lockMsg = ''; render(); } }
@@ -1528,7 +1557,7 @@ const SharedBackup = (() => {
 
 // What a backup holds: reviews and counters, prep notes, tags. Portfolio amounts only when asked for. Never the connection or keys.
 function backupObject(withHoldings = true) {
-  return { app: 'myday', version: 1, exportedAt: Date.now(), reviews: S.reviews, prep: S.prep, tags: S.tags, sports: {plans:S.sports.plans}, ...(withHoldings ? { holdings: S.crypto.holdings } : {}) };
+  return { app: 'myday', version: 1, exportedAt: Date.now(), reviews: S.reviews, prep: S.prep, tags: S.tags, supplements: suppList(), sports: {plans:S.sports.plans}, ...(withHoldings ? { holdings: S.crypto.holdings } : {}) };
 }
 /** Adds a backup to what is on the phone: a day is replaced only by a newer version of it, nothing is deleted. Returns the number of days taken over. */
 function mergeBackup(d) {
@@ -1538,6 +1567,7 @@ function mergeBackup(d) {
   for (const [k, v] of Object.entries(d.prep || {})) if (!S.prep[k]) S.prep[k] = v;
   for(const [id,p] of Object.entries(d.sports?.plans||{})){if(p&&typeof p==='object'&&p.id===id&&(!S.sports.plans[id]||(p.updatedAt||0)>(S.sports.plans[id].updatedAt||0)))S.sports.plans[id]=p;}
   for (const t of d.tags || []) if (!S.tags.includes(t)) S.tags.push(t);
+  if (Array.isArray(d.supplements)) for (const t of d.supplements) if (typeof t === 'string' && !suppList().includes(t)) S.settings.supplements = [...suppList(), t.slice(0, 40)];
   for (const h of d.holdings || []) if (h && h.id && !S.crypto.holdings.some(x => x.id === h.id)) S.crypto.holdings.push(h);
   save();
   return n;
