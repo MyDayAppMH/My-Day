@@ -1,6 +1,6 @@
 
 'use strict';
-const BUILD = '2026-11-11.sports9';
+const BUILD = '2026-11-12.layout1';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -9,6 +9,9 @@ const POCKET_CRM_URL = 'https://contact-capture.matthias-homan.workers.dev/';
 const LINKEDIN_URL = 'https://www.linkedin.com/feed/';
 const RANKINGS_URL = 'https://matthias-sport.github.io/racket-rankings-app/';
 const RANKINGS_PACKAGE = 'org.chromium.webapk.a0d7a67882b031cc1_v2'; // the installed Racket Rankings app (chrome://webapks lists it)
+const LIBRARY_URL = 'https://librarymh.github.io/library-app/';
+const GOLF_URL = 'https://golfcaddie-ai.github.io/golfcaddie-ai/';
+const CALORIE_URL = 'https://caloriesin-n-out.github.io/Calorie-tracker/';
 const GYM_URL = 'https://gymmh.github.io/gym-app/';
 const GYM_PACKAGE = 'org.chromium.webapk.a09d48c4912ac408f_v2'; // the installed Gym app (chrome://webapks lists it)
 const POCKET_CRM_PACKAGE = 'org.chromium.webapk.a5bf4b8d4443f6622_v2'; // the installed Pocket CRM app (Chrome's chrome://webapks lists it)
@@ -407,6 +410,10 @@ function dayShape(events, date) {
 
 /* ---------- rendering ---------- */
 const NAV = [['today', 'Day', '▦'], ['sports', 'Sports', '◷'], ['review', 'Review', '☺'], ['more', 'More', '≡']];
+const LAYOUT_STYLES = `<style>
+.layout-checkin{padding:0;overflow:hidden}.layout-checkin-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px 0;font-size:13px}.layout-checkin-top .muted{font-size:12px;margin-left:5px}.layout-log{border:0;background:none;padding:8px 0 8px 8px;font-size:13px;white-space:nowrap}.layout-checkin summary{list-style:none;display:flex;align-items:center;gap:9px;min-height:48px;padding:8px 12px;cursor:pointer;font-size:13px}.layout-checkin summary::-webkit-details-marker,.layout-review-details summary::-webkit-details-marker{display:none}.layout-checkin summary .muted{flex:1;min-width:0}.layout-checkin summary .layout-water{font-size:13px;flex:none;min-height:36px;padding:4px 6px;border:0;background:transparent}.layout-checkin[open] .layout-chevron,.layout-review-details[open] .layout-chevron{transform:rotate(180deg)}.layout-checkin-content{padding:0 12px 12px;border-top:1px solid var(--line)}.layout-checkin-content .rd{margin-top:10px}.layout-checkin-content .track{margin-top:10px}.layout-review-details{padding:0}.layout-review-details summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:48px;padding:12px 14px;font-size:14px}.layout-review-details summary span{font-size:12px;color:var(--muted);text-align:right}.layout-review-details .layout-details-body{padding:0 14px 14px}.layout-review-note{font-size:12px;margin:8px 3px 0}.layout-review-core .field{width:100%;min-width:0}.layout-review-core textarea{min-height:100px}.layout-more-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.layout-more-grid .menu{margin:0;min-width:0;align-items:flex-start;padding:12px;min-height:76px}.layout-more-grid .menu i{display:none}.layout-more-grid .menu span{min-width:0;font-size:14px}.layout-more-grid .menu small{font-size:11px;line-height:1.4;margin-top:4px;overflow-wrap:anywhere}.layout-more h2{font-size:16px;margin:18px 2px 8px}.layout-more-group{padding:0 12px}.layout-more-group .menu{border:0;border-bottom:1px solid var(--line);border-radius:0;margin:0;padding:12px 2px;background:none}.layout-more-group .menu:last-child{border-bottom:0}.layout-more-group .menu i{display:none}.layout-more-group .menu span{font-size:14px}.layout-more-group .menu small{font-size:11px}.layout-top-settings{align-self:center;min-height:40px}.layout-review-core .saved{min-height:18px}
+</style>`;
+let dayCheckOpen = false, reviewDetailsOpen = false;
 function render() {
   sportsSyncReview();
   const active = { history: 'more', settings: 'more', portfolio: 'more' }[view] || view, unread = S.inbox ? S.inbox.unread : 0;
@@ -414,7 +421,7 @@ function render() {
   $('nav').querySelectorAll('button').forEach(b => b.onclick = () => go(b.dataset.v));
   $('fabslot').innerHTML = view === 'today' ? '<button class="fab" data-act="fab" aria-label="Add">+</button>' : '';
   const app = $('app');
-  app.innerHTML = { today: dayHtml, inbox: inboxHtml, review: reviewHtml, more: moreHtml, history: historyHtml, settings: settingsHtml, portfolio: portfolioHtml, sports: sportsHtml }[view]();
+  app.innerHTML = LAYOUT_STYLES + { today: dayHtml, inbox: inboxHtml, review: reviewHtml, more: moreHtml, history: historyHtml, settings: settingsHtml, portfolio: portfolioHtml, sports: sportsHtml }[view]();
   bind(app); bind($('fabslot'));
   if (slideDir && view === 'today') { app.classList.remove('slide-next', 'slide-prev'); void app.offsetWidth; app.classList.add('slide-' + slideDir); }
   slideDir = '';
@@ -547,19 +554,24 @@ function dayHtml() {
   const y = addDays(today(), -1), needReview = isToday && !(S.reviews[y] && (S.reviews[y].mood || S.reviews[y].did)) && new Date().getHours() < 14;
   const stale = S.status.cal && !S.status.cal.ok && c ? `<div class="errbox">Could not refresh the calendar: ${esc(S.status.cal.message)}<br>Showing the copy from ${new Date(c.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.</div>` : '';
   const calMsg = !c ? `<p class="empty">${connected() ? (loading ? 'Loading your calendar…' : S.status.cal && !S.status.cal.ok ? esc(S.status.cal.message) : 'Nothing loaded yet.') : 'Connect Google in Settings to see your meetings.'}</p>` : '';
-  return `<div class="hd"><div><h1>${longDate(d)}</h1><div class="mu">${esc(sub)}</div></div>${pill(isToday ? '' : '<button class="pill" data-act="today">Today</button>')}</div>
+  return `<div class="hd"><div><h1>${parseYmd(d).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}</h1><div class="mu">${esc(sub)}</div></div>${pill(isToday ? '' : '<button class="pill" data-act="today">Today</button>')}</div>
     ${weekHtml(d)}
     <div class="stack">
-    ${needReview ? `<div class="nudge"><span><b>How was yesterday?</b><span class="muted" style="font-size:14px">30 seconds to log it.</span></span><button class="btn day" data-act="review-yesterday">Log it</button></div>` : ''}
-    ${isToday ? readinessCard(d) : ''}${isToday ? healthLine(d) : ''}${d <= today() ? trackCard(d) : ''}${isToday ? portfolioLine() : ''}
+    ${isToday ? dayCheckinHtml(d, needReview) : d <= today() ? trackCard(d) : ''}${isToday ? portfolioLine() : ''}
     ${allDay.length ? `<div class="allday">${allDay.map(e => `<span>${esc(e.title)}</span>`).join('')}</div>` : ''}
     ${trayHtml(d, b)}
+    <h2 style="font-size:16px;margin:12px 2px 8px">Agenda</h2>
     ${sh ? `<p class="shape"><b>${sh.count} meeting${sh.count > 1 ? 's' : ''}</b> · ${dur(sh.mins)} booked${sh.free ? ` · longest free block <b>${timeStr(sh.free[0])}–${timeStr(sh.free[1])}</b>` : ''}</p>` : ''}
     ${calMsg}${timelineHtml(d, timed, b.timed)}${stale}
     ${c && c.errors && c.errors.length ? `<div class="errbox">Some calendars could not be read: ${esc(c.errors.map(e => e.calendar).join(', '))}</div>` : ''}
     </div>`;
 }
 
+function dayCheckinHtml(d, needReview) {
+  const r = readiness(d), entry = S.reviews[d] || {};
+  const label = r.pending ? 'Readiness pending' : `Readiness ${r.score}/10`;
+  return `<div class="card layout-checkin"><div class="layout-checkin-top"><div><b>Check-in</b>${needReview ? ' <span class="muted">Yesterday not logged</span>' : ''}</div>${needReview ? '<button class="layout-log" data-act="review-yesterday">Log it ›</button>' : ''}</div><details class="layout-checkin" id="dayCheckDetails" ${dayCheckOpen ? 'open' : ''}><summary><span class="muted">${esc(label)} · Water ${entry.water || 0}</span><button class="layout-water" data-cnt data-date="${d}" data-key="water" data-by="1" aria-label="Add a glass of water">+ water</button><span class="layout-chevron">⌄</span></summary><div class="layout-checkin-content">${readinessCard(d)}${healthLine(d)}${trackCard(d)}</div></details></div>`;
+}
 /* ----- readiness for training (1 to 10), from your own sleep, resting heart rate, HRV and recent load ----- */
 const median = a => { const s = a.slice().sort((x, y) => x - y), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 // Your normal for a metric: the median of up to 28 earlier days, and how much it usually varies (robust spread, with a floor so tiny wobbles do not count).
@@ -664,17 +676,14 @@ function inboxHtml() {
 
 /* ----- more / history ----- */
 function moreHtml() {
-  return `<div class="hd"><h1>More</h1>${pill()}</div>
-    <button class="menu" data-act="new-note-now"><i>＋</i><span>New meeting note<small>Creates it in your Notion Meetings database and opens it</small></span></button>
-    <a class="menu" href="${MEETINGS_DB_URL}" target="_blank" rel="noopener"><i>▤</i><span>Meetings database<small>Open in Notion</small></span></a>
-    <a class="menu" href="${TASKS_DB_URL}" target="_blank" rel="noopener"><i>☑</i><span>Task database<small>Open in Notion</small></span></a>
-    <a class="menu" href="${POCKET_CRM_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(POCKET_CRM_URL, POCKET_CRM_PACKAGE))}"><i>☎</i><span>Pocket CRM<small>Your contacts, people and next meetings</small></span></a>
-    <a class="menu" href="${LINKEDIN_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(LINKEDIN_URL, 'com.linkedin.android'))}"><i>in</i><span>LinkedIn<small>Opens the LinkedIn app</small></span></a>
-    <a class="menu" href="${RANKINGS_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(RANKINGS_URL, RANKINGS_PACKAGE))}"><i>🎾</i><span>Racket Rankings<small>Your tennis and padel results and rankings</small></span></a>
-    <a class="menu" href="${GYM_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(GYM_URL, GYM_PACKAGE))}"><i>🏋</i><span>Gym<small>Your workouts, programme and progress</small></span></a>
-    <button class="menu" data-act="to-portfolio"><i>◔</i><span>Portfolio<small>${portfolioSubtitle()}</small></span></button>
-    <button class="menu" data-act="to-history"><i>↗</i><span>History<small>Mood over time and patterns</small></span></button>
-    <button class="menu" data-act="to-settings"><i>⚙</i><span>Settings<small>Connection, theme, backup</small></span></button>`;
+ return `<div class="layout-more"><div class="hd"><h1>More</h1><button class="pill layout-top-settings" data-act="to-settings">Settings ›</button></div><h2>Your apps</h2><div class="layout-more-grid"><a class="menu" href="${POCKET_CRM_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(POCKET_CRM_URL, POCKET_CRM_PACKAGE))}"><i>☎</i><span>Pocket CRM<small>Your contacts, people and next meetings</small></span></a>
+<a class="menu" href="${LINKEDIN_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(LINKEDIN_URL, 'com.linkedin.android'))}"><i>in</i><span>LinkedIn<small>Opens the LinkedIn app</small></span></a>
+<a class="menu" href="${RANKINGS_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(RANKINGS_URL, RANKINGS_PACKAGE))}"><i>🎾</i><span>Racket Rankings<small>Your tennis and padel results and rankings</small></span></a>
+<a class="menu" href="${GYM_URL}" target="_blank" rel="noopener" data-android="${esc(intentLink(GYM_URL, GYM_PACKAGE))}"><i>🏋</i><span>Gym<small>Your workouts, programme and progress</small></span></a>
+    <a class="menu" href="${GOLF_URL}" target="_blank" rel="noopener"><span>GolfCaddie<small>Golf rounds</small></span></a>
+    <a class="menu" href="${LIBRARY_URL}" target="_blank" rel="noopener"><span>Library<small>Books and reading</small></span></a>
+    <a class="menu" href="${CALORIE_URL}" target="_blank" rel="noopener"><span>Calorie tracker<small>Food and nutrition</small></span></a>
+<button class="menu" data-act="to-portfolio"><i>◔</i><span>Portfolio<small>${portfolioSubtitle()}</small></span></button></div><h2>Notion</h2><div class="card layout-more-group"><button class="menu" data-act="new-note-now"><i>＋</i><span>New meeting note<small>Creates it in your Notion Meetings database and opens it</small></span></button><a class="menu" href="${MEETINGS_DB_URL}" target="_blank" rel="noopener"><i>▤</i><span>Meetings database<small>Open in Notion</small></span></a><a class="menu" href="${TASKS_DB_URL}" target="_blank" rel="noopener"><i>☑</i><span>Task database<small>Open in Notion</small></span></a></div><h2>MyDay</h2><div class="card layout-more-group"><button class="menu" data-act="to-history"><i>↗</i><span>History<small>Mood over time and patterns</small></span></button><button class="menu" data-act="to-settings"><i>⚙</i><span>Settings<small>Connection, theme, backup</small></span></button></div></div>`;
 }
 function insightHtml(days) {
   const rows = days.map(d => ({ d, r: S.reviews[d], h: S.health[d] })).filter(x => x.r && x.r.mood);
@@ -751,22 +760,23 @@ function factsHtml(date) {
 function reviewHtml() {
   const r = S.reviews[reviewDate] || {}, tags = [...BASE_TAGS, ...S.tags];
   return `${dateBar(reviewDate, 'rprev', 'rnext')}<div class="stack">
-    <div class="card"><h3>How was the day?</h3>
+    <div class="card layout-review-core"><h3>How was the day?</h3>
       <div class="moods">${MOODS.map(([e, l], i) => `<button data-mood="${i + 1}" class="${r.mood === i + 1 ? 'on' : ''}" aria-label="${l}">${e}<small>${l}</small></button>`).join('')}</div>
       <span class="lbl2">Energy</span>
       <div class="scale">${[1, 2, 3, 4, 5].map(n => `<button data-energy="${n}" class="${r.energy === n ? 'on' : ''}">${n}</button>`).join('')}</div>
       <div class="scalehint"><span>drained</span><span>full of energy</span></div>
-      <span class="lbl2">Sport</span><p class="muted" style="font-size:12px">Completed activities select their sport automatically on the activity day. Plans and class calendar holds do not.</p>
-      <div class="chips">${SPORT_TAGS.map(t => `<button class="chip ${(r.tags || []).includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}</div>
-      <span class="lbl2">What was it about?</span>
-      <div class="chips">${tags.map(t => `<button class="chip ${(r.tags || []).includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}<button class="chip" data-act="new-tag">+ tag</button></div>
-      <span class="lbl2">Water, alcohol and other</span>
-      ${trackHtml(reviewDate, true)}
       <span class="lbl2">What happened</span>
       <textarea class="field" id="did" style="margin-top:0" placeholder="Meetings, workout, who you saw, anything worth remembering">${esc(r.did || '')}</textarea>
       <span class="lbl2">Best moment or one win</span>
       <input class="field" id="win" style="margin-top:0" value="${esc(r.win || '')}" placeholder="Optional">
       <div class="saved" id="saved">${r.updatedAt ? 'Saved ✓' : ''}</div></div>
+    <details class="card layout-review-details" id="reviewDetails" ${reviewDetailsOpen ? 'open' : ''}><summary><b>Details</b><span>Tags, sport, water & more <i class="layout-chevron">⌄</i></span></summary><div class="layout-details-body">      <span class="lbl2">Sport</span><p class="muted" style="font-size:12px">Completed activities select their sport automatically on the activity day. Plans and class calendar holds do not.</p>
+      <div class="chips">${SPORT_TAGS.map(t => `<button class="chip ${(r.tags || []).includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}</div>
+      <span class="lbl2">What was it about?</span>
+      <div class="chips">${tags.map(t => `<button class="chip ${(r.tags || []).includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}<button class="chip" data-act="new-tag">+ tag</button></div>
+      <span class="lbl2">Water, alcohol and other</span>
+      ${trackHtml(reviewDate, true)}
+</div></details><p class="muted layout-review-note">Completed sports still fill in automatically.</p>
     ${factsHtml(reviewDate)}
     ${r.updatedAt ? `<button class="btn" data-act="clear-review">Clear this day's review</button>` : ''}</div>`;
 }
@@ -1252,6 +1262,11 @@ function bind(root) {
   root.querySelectorAll('[data-act]').forEach(b => b.onclick = () => act(b.dataset.act));
   if (view === 'review') bindReview(root);
   if (view === 'settings') { const f = $('importFile'); if (f) f.onchange = importData; }
+  const checkDetails = root.querySelector('#dayCheckDetails');
+  if (checkDetails) checkDetails.ontoggle = () => { dayCheckOpen = checkDetails.open; };
+  const optionalDetails = root.querySelector('#reviewDetails');
+  if (optionalDetails) optionalDetails.ontoggle = () => { reviewDetailsOpen = optionalDetails.open; };
+  root.querySelectorAll('summary [data-cnt]').forEach(b => b.addEventListener('click', e => e.preventDefault()));
   const tray = root.querySelector('#tray');
   if (tray) tray.ontoggle = () => { S.settings.trayOpen = tray.open; save(); };
   root.querySelectorAll('.tray .mini').forEach(b => b.addEventListener('click', e => e.preventDefault()));
