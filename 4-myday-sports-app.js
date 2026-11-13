@@ -1,6 +1,6 @@
 
 'use strict';
-const BUILD = '2026-11-12.supps1';
+const BUILD = '2026-11-13.dictate1';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -427,6 +427,7 @@ const LAYOUT_STYLES = `<style>
 .layout-checkin summary{flex-wrap:wrap;row-gap:8px}.layout-checkin summary .ckline{order:1}.layout-checkin summary .layout-chevron{order:2;min-width:32px;text-align:center}.layout-checkin summary .ckbtns{order:3;flex:0 0 100%;display:flex;gap:12px}.ckbtn{flex:1 1 0;min-width:0;min-height:48px;border:1px solid var(--line);background:var(--card);border-radius:12px;font-size:15px;font-weight:600;padding:8px 10px}.layout-checkin summary .layout-water.ckbtn{flex:1 1 0;min-height:48px;padding:8px 10px;border:1px solid var(--line);background:var(--card)}
 .sm{min-width:52px;height:48px}.drow{gap:12px;padding:6px 2px}.tick{min-height:48px}.tick input{width:26px;height:26px}.cnt .big{min-height:56px}
 .supps{padding:14px}.supphead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}.supphead h3{margin:0}.chip.sup{min-height:48px;padding:10px 16px;font-size:15px}.chips:has(.sup){gap:10px}.suppall{margin-top:12px;min-height:48px;width:100%}
+.microw{display:flex;align-items:center;justify-content:space-between;gap:8px}.microw .lbl2{margin:14px 2px 6px}.mic{min-height:44px;padding:8px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-size:14px;font-weight:600;margin-top:6px}.mic.rec{background:#c0392b;color:#fff;border-color:#c0392b;animation:micpulse 1.3s infinite}@keyframes micpulse{50%{opacity:.75}}.micstat{min-height:18px;font-size:13px;color:var(--muted);margin:4px 2px 0;overflow-wrap:anywhere}
 .lockbox{text-align:center;padding:30px 18px}.lockbox .big{font-size:38px}
 </style>`;
 let trayAll = false, dayCheckOpen = false, reviewDetailsOpen = false;
@@ -437,6 +438,7 @@ function render() {
   $('nav').querySelectorAll('button').forEach(b => b.onclick = () => go(b.dataset.v));
   $('fabslot').innerHTML = view === 'today' ? '<button class="fab" data-act="fab" aria-label="Add">+</button>' : '';
   const app = $('app');
+  if (mic.on && view !== 'review') micStop();
   const locked = viewLocked(view);
   app.innerHTML = LAYOUT_STYLES + (locked ? lockScreenHtml(view) : { today: dayHtml, inbox: inboxHtml, review: reviewHtml, more: moreHtml, history: historyHtml, settings: settingsHtml, portfolio: portfolioHtml, sports: sportsHtml }[view]());
   if (locked && lockTried !== view) { lockTried = view; setTimeout(lockUnlock, 50); } else if (!locked) lockTried = '';
@@ -810,10 +812,11 @@ function reviewHtml() {
       <span class="lbl2">Energy</span>
       <div class="scale">${[1, 2, 3, 4, 5].map(n => `<button data-energy="${n}" class="${r.energy === n ? 'on' : ''}">${n}</button>`).join('')}</div>
       <div class="scalehint"><span>drained</span><span>full of energy</span></div>
-      <span class="lbl2">What happened</span>
+      <div class="microw"><span class="lbl2">What happened</span><button class="mic" type="button" data-mic="did" aria-pressed="false">🎤 Dictate</button></div>
       <textarea class="field" id="did" style="margin-top:0" placeholder="Meetings, workout, who you saw, anything worth remembering">${esc(r.did || '')}</textarea>
-      <span class="lbl2">Best moment or one win</span>
-      <input class="field" id="win" style="margin-top:0" value="${esc(r.win || '')}" placeholder="Optional">
+      <div class="micstat" id="micStat-did"></div>
+      <div class="microw"><span class="lbl2">Best moment or one win</span><button class="mic" type="button" data-mic="win" aria-pressed="false">🎤 Dictate</button></div>
+      <input class="field" id="win" style="margin-top:0" value="${esc(r.win || '')}" placeholder="Optional"><div class="micstat" id="micStat-win"></div>
       <div class="saved" id="saved">${r.updatedAt ? 'Saved ✓' : ''}</div></div>
     ${suppCardHtml(reviewDate)}
     <details class="card layout-review-details" id="reviewDetails" ${reviewDetailsOpen ? 'open' : ''}><summary><b>Details</b><span>Tags, sport, water & more <i class="layout-chevron">⌄</i></span></summary><div class="layout-details-body">      <span class="lbl2">Sport</span><p class="muted" style="font-size:12px">Completed activities select their sport automatically on the activity day. Plans and class calendar holds do not.</p>
@@ -875,6 +878,8 @@ function bindReview(root) {
   });
   const typed = (id, key) => { const el = $(id); if (!el) return; el.oninput = () => { clearTimeout(saveTimer); $('saved').textContent = 'Saving…'; saveTimer = setTimeout(() => patchReview({ [key]: el.value }), 400); }; el.onblur = () => { clearTimeout(saveTimer); patchReview({ [key]: el.value }); }; };
   typed('did', 'did'); typed('win', 'win');
+  root.querySelectorAll('[data-mic]').forEach(b => b.onclick = () => micStart(b.dataset.mic));
+  micUi(mic.on ? 'Listening…' : '');
 }
 
 /* ----- portfolio (prices from CoinMarketCap; amounts stay on this phone) ----- */
@@ -1052,6 +1057,10 @@ function settingsHtml() {
     <div class="card"><h3>Your supplements</h3>
       <p class="muted">The list on the Review tab. Tap one to remove it from the list; the days you already ticked keep it.</p>
       <div class="chips">${suppList().map(t => `<button class="chip on" data-suppdel="${esc(t)}">${esc(t)} ✕</button>`).join('')}<button class="chip" data-act="supp-add">+ add</button></div></div>
+    <div class="card"><h3>Dictation</h3>
+      <label class="lbl2" for="dictLang" style="margin-top:0">Language you speak</label>
+      <select class="field" style="margin-top:0" id="dictLang">${DICT_LANGS.map(([v, l]) => `<option value="${v}" ${(S.settings.dictLang || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <p class="muted" style="font-size:12px;margin:6px 0 0">The 🎤 button on the Review turns your voice into text. Chrome sends the audio to Google to do this; My Day keeps only the text. ${SpeechRec ? '' : '<b>This browser does not support it.</b>'}</p></div>
     ${lockSettingsHtml()}
     <div class="card"><h3>Shared backup (Notion)</h3>
       <p class="muted">Saves My Day, and your other apps, into the Notion database <b>App backups</b> through your Pocket CRM service. It backs up by itself once a day when you open the app.</p>
@@ -1314,7 +1323,7 @@ function bind(root) {
   root.querySelectorAll('[data-theme-set]').forEach(b => b.onclick = () => { S.settings.theme = b.dataset.themeSet; save(); applyTheme(); render(); });
   root.querySelectorAll('[data-act]').forEach(b => b.onclick = () => act(b.dataset.act));
   if (view === 'review' && !viewLocked(view)) bindReview(root);
-  if (view === 'settings') { const f = $('importFile'); if (f) f.onchange = importData; bindLock(); }
+  if (view === 'settings') { const f = $('importFile'); if (f) f.onchange = importData; bindLock(); const dl = $('dictLang'); if (dl) dl.onchange = () => { S.settings.dictLang = dl.value; save(); }; }
   const checkDetails = root.querySelector('#dayCheckDetails');
   if (checkDetails) checkDetails.ontoggle = () => { dayCheckOpen = checkDetails.open; };
   const optionalDetails = root.querySelector('#reviewDetails');
@@ -1432,6 +1441,48 @@ function toast(msg, label, fn) {
   toastTimer = setTimeout(() => { $('toast').innerHTML = ''; }, label ? 9000 : 3500);
 }
 
+
+
+/* ---------- dictation: speak instead of typing (Review: What happened, Best moment) ---------- */
+// Chrome's own speech recognition. It sends the audio to Google to make the text; My Day keeps only the text.
+const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+const DICT_LANGS = [['', 'Phone language'], ['en-GB', 'English'], ['es-ES', 'Español'], ['de-DE', 'Deutsch']];
+const mic = { on: false, rec: null, key: '', stop: false, started: 0 };
+const micField = k => $(k === 'did' ? 'did' : 'win');
+function micUi(msg) {
+  document.querySelectorAll('[data-mic]').forEach(b => { const on = mic.on && mic.key === b.dataset.mic; b.classList.toggle('rec', on); b.textContent = on ? '■ Stop' : '🎤 Dictate'; b.setAttribute('aria-pressed', String(on)); });
+  document.querySelectorAll('.micstat').forEach(e => { e.textContent = e.id === 'micStat-' + mic.key ? (msg || '') : ''; });
+}
+/** Adds spoken text at the end of the field: a space between, a capital letter at the start of a sentence. */
+function micInsert(key, text) {
+  const el = micField(key), t0 = text.trim(); if (!el || !t0) return;
+  const cur = el.value, sep = !cur || /\s$/.test(cur) ? '' : ' ', cap = !cur.trim() || /[.!?]\s*$/.test(cur.trim());
+  el.value = cur + sep + (cap ? t0[0].toUpperCase() + t0.slice(1) : t0);
+  patchReview({ [key]: el.value });
+}
+function micStop() { mic.stop = true; mic.on = false; try { mic.rec && mic.rec.stop(); } catch { /* already stopped */ } micUi(''); }
+function micStart(key) {
+  if (!SpeechRec) return toast('Dictation is not available in this browser. Use the microphone on your keyboard instead.');
+  if (mic.on) { const same = mic.key === key; micStop(); if (same) return; }
+  const rec = new SpeechRec();
+  rec.lang = S.settings.dictLang || navigator.language || 'en-GB'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+  Object.assign(mic, { rec, key, on: true, stop: false, started: Date.now() });
+  rec.onresult = ev => {
+    let fin = '', interim = '';
+    for (let i = ev.resultIndex; i < ev.results.length; i++) { const r = ev.results[i]; if (r.isFinal) fin += r[0].transcript; else interim += r[0].transcript; }
+    if (fin) micInsert(key, fin);
+    micUi(interim ? '… ' + interim : 'Listening…');
+  };
+  rec.onerror = ev => {
+    if (ev.error === 'no-speech' || ev.error === 'aborted') return; // silence: onend restarts it
+    mic.stop = true; mic.on = false;
+    micUi({ 'not-allowed': 'The microphone is blocked. In Chrome: site settings, Microphone, Allow.', 'service-not-allowed': 'The microphone is blocked. In Chrome: site settings, Microphone, Allow.', network: 'Dictation needs a connection.', 'audio-capture': 'No microphone found.' }[ev.error] || 'Dictation stopped (' + ev.error + ').');
+  };
+  // Chrome ends a session after a pause; keep listening until Stop (at most two minutes).
+  rec.onend = () => { if (mic.on && !mic.stop && mic.rec === rec && Date.now() - mic.started < 120000) { try { rec.start(); return; } catch { /* fall through */ } } if (mic.rec === rec && !mic.stop) { mic.on = false; micUi(''); } };
+  try { rec.start(); micUi('Listening…'); } catch { mic.on = false; micUi('Could not start the microphone.'); }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && mic.on) micStop(); });
 
 /* ---------- fingerprint lock (Review, History, Portfolio and the private counters) ---------- */
 // The phone's own fingerprint or screen lock through WebAuthn. It keeps people who pick up your unlocked phone out of these screens;
