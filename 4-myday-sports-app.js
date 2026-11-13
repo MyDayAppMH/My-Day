@@ -1,6 +1,6 @@
 
 'use strict';
-const BUILD = '2026-11-13.dictate1';
+const BUILD = '2026-11-13.layout4';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -426,11 +426,16 @@ const LAYOUT_STYLES = `<style>
 .layout-more-grid .menu{gap:10px}.layout-more-grid .menu i{display:block;flex:none;width:24px;margin-top:1px;font-size:20px;line-height:1.1;font-style:normal;text-align:center}
 .layout-checkin summary{flex-wrap:wrap;row-gap:8px}.layout-checkin summary .ckline{order:1}.layout-checkin summary .layout-chevron{order:2;min-width:32px;text-align:center}.layout-checkin summary .ckbtns{order:3;flex:0 0 100%;display:flex;gap:12px}.ckbtn{flex:1 1 0;min-width:0;min-height:48px;border:1px solid var(--line);background:var(--card);border-radius:12px;font-size:15px;font-weight:600;padding:8px 10px}.layout-checkin summary .layout-water.ckbtn{flex:1 1 0;min-height:48px;padding:8px 10px;border:1px solid var(--line);background:var(--card)}
 .sm{min-width:52px;height:48px}.drow{gap:12px;padding:6px 2px}.tick{min-height:48px}.tick input{width:26px;height:26px}.cnt .big{min-height:56px}
-.supps{padding:14px}.supphead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}.supphead h3{margin:0}.chip.sup{min-height:48px;padding:10px 16px;font-size:15px}.chips:has(.sup){gap:10px}.suppall{margin-top:12px;min-height:48px;width:100%}
-.microw{display:flex;align-items:center;justify-content:space-between;gap:8px}.microw .lbl2{margin:14px 2px 6px}.mic{min-height:44px;padding:8px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-size:14px;font-weight:600;margin-top:6px}.mic.rec{background:#c0392b;color:#fff;border-color:#c0392b;animation:micpulse 1.3s infinite}@keyframes micpulse{50%{opacity:.75}}.micstat{min-height:18px;font-size:13px;color:var(--muted);margin:4px 2px 0;overflow-wrap:anywhere}
+.chip.sup{min-height:48px;padding:10px 16px;font-size:15px}.chips:has(.sup){gap:10px}.microw{display:flex;align-items:center;justify-content:space-between;gap:8px}.microw .lbl2{margin:14px 2px 6px}.mic{min-height:44px;padding:8px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-size:14px;font-weight:600;margin-top:6px}.mic.rec{background:#c0392b;color:#fff;border-color:#c0392b;animation:micpulse 1.3s infinite}@keyframes micpulse{50%{opacity:.75}}.micstat:empty{display:none}.micstat{min-height:18px;font-size:13px;color:var(--muted);margin:4px 2px 0;overflow-wrap:anywhere}
+.infoi{border:0;background:none;font-size:17px;min-width:44px;min-height:44px;color:var(--muted);padding:0}.infotxt{font-size:13px;margin:0 0 8px}.infotxt[hidden]{display:none}.lblrow{display:flex;align-items:center;gap:0}.lblrow+.infotxt{margin-top:-4px}
+.fw{position:relative}.fw .field{padding-right:58px}.mic-in{position:absolute;right:6px;bottom:6px;width:46px;height:46px;min-height:0;padding:0;margin:0;border-radius:50%;font-size:19px}.fw.one .mic-in{top:50%;bottom:auto;transform:translateY(-50%)}
+.tickgrid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.supps{padding:0}.supps summary{list-style:none;display:flex;align-items:center;gap:10px;min-height:56px;padding:6px 14px;cursor:pointer}.supps summary::-webkit-details-marker{display:none}.suppt{flex:1;min-width:0}.supps .suppall{margin:0;min-height:44px;width:auto;padding:8px 14px;flex:none}.supps[open] .layout-chevron{transform:rotate(180deg)}.supps .suppbody{padding:0 14px 14px}
+.setjump{margin:0 0 4px}.setjump .chip{min-height:40px}.setsec{padding:0;scroll-margin-top:8px}.setsec summary{list-style:none;display:flex;align-items:center;gap:10px;min-height:56px;padding:8px 14px;cursor:pointer}.setsec summary::-webkit-details-marker{display:none}.setsec summary b{flex:1;font-size:16px}.setsec summary .muted{font-size:13px;text-align:right}.setsec[open] summary .layout-chevron{transform:rotate(180deg)}.secbody{padding:0 14px 14px}
+.sleepchart{margin-top:14px}.sleepchart svg{width:100%;height:auto;display:block}.sleepkey{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:4px}.sleepkey i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
 .lockbox{text-align:center;padding:30px 18px}.lockbox .big{font-size:38px}
 </style>`;
-let trayAll = false, dayCheckOpen = false, reviewDetailsOpen = false;
+let suppOpen = false, trayAll = false, dayCheckOpen = false, reviewDetailsOpen = false;
 function render() {
   sportsSyncReview();
   const active = { history: 'more', settings: 'more', portfolio: 'more' }[view] || view, unread = S.inbox ? S.inbox.unread : 0;
@@ -655,6 +660,29 @@ function readinessCard(date) {
   const note = r.ill ? 'You marked yourself ill or injured, so it is held at 5.' : r.flags.length ? `Body signals look off: ${r.flags[0]}.` : r.missing.length ? `Based on ${r.parts.map(p => p.name.toLowerCase()).join(' and ')}.` : 'Sleep, HRV, resting heart rate and recent load.';
   return `<button class="rd" data-act="readiness"><span class="n" style="color:${readinessColor(r.score)}">${r.score}<small>/10</small></span><span class="t"><b>${r.label}</b><span>${esc(note)}</span></span></button>`;
 }
+/** The last 14 nights as stacked bars: deep, REM and the rest of the sleep, with a line at 8 hours. */
+function sleepChartHtml(date) {
+  const rows = Array.from({ length: 14 }, (_, i) => { const d = addDays(date, i - 13); return { d, h: S.health[d] || {} }; });
+  const have = rows.filter(x => typeof x.h.sleepMinutes === 'number');
+  if (have.length < 2) return '';
+  const max = Math.max(600, ...have.map(x => x.h.sleepMinutes)), W = 320, H = 132, top = 8, bot = 22, step = (W - 8) / 14, bw = 16, y = m => top + (H - top - bot) * (1 - m / max);
+  const C = { deep: '#5b7cfa', rem: '#b26be0', light: '#4fb3a9' };
+  const bars = rows.map((x, i) => {
+    const t = x.h.sleepMinutes, bx = 4 + i * step; if (typeof t !== 'number') return '';
+    const staged = typeof x.h.sleepDeepMin === 'number', deep = staged ? x.h.sleepDeepMin : 0, rem = staged ? (x.h.sleepRemMin || 0) : 0, light = Math.max(0, t - deep - rem);
+    let acc = 0; const seg = (m, c) => { if (m <= 0) return ''; const r = `<rect x="${bx.toFixed(1)}" y="${y(acc + m).toFixed(1)}" width="${bw}" height="${(y(acc) - y(acc + m)).toFixed(1)}" fill="${c}" rx="2"/>`; acc += m; return r; };
+    return `<g><title>${esc(shortDate(x.d))}: ${esc(dur(t))}${staged ? `, deep ${esc(dur(deep))}, REM ${esc(dur(rem))}` : ''}</title>${seg(deep, C.deep)}${seg(rem, C.rem)}${seg(light, C.light)}</g>`;
+  }).join('');
+  const labels = rows.map((x, i) => `<text x="${(4 + i * step + bw / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle" font-size="9" fill="currentColor" opacity="${x.d === date ? 1 : .55}" font-weight="${x.d === date ? 700 : 400}">${esc(parseYmd(x.d).toLocaleDateString([], { weekday: 'narrow' }))}</text>`).join('');
+  const avg = k => { const v = have.map(x => x.h[k]).filter(n => typeof n === 'number'); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  const aT = avg('sleepMinutes'), aD = avg('sleepDeepMin'), aR = avg('sleepRemMin');
+  return `<div class="sleepchart"><b style="font-weight:600">Sleep, last 14 nights</b>
+    <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Sleep per night for the last 14 nights, split into deep, REM and other sleep">
+      <line x1="0" x2="${W}" y1="${y(480).toFixed(1)}" y2="${y(480).toFixed(1)}" stroke="currentColor" stroke-opacity=".3" stroke-dasharray="3 3"/><text x="${W}" y="${(y(480) - 3).toFixed(1)}" text-anchor="end" font-size="9" fill="currentColor" opacity=".6">8 h</text>
+      ${bars}${labels}</svg>
+    <div class="sleepkey"><span><i style="background:${C.deep}"></i>Deep</span><span><i style="background:${C.rem}"></i>REM</span><span><i style="background:${C.light}"></i>Other</span></div>
+    <p class="muted num" style="font-size:13px;margin:6px 0 0">Average ${esc(dur(Math.round(aT)))}${aD != null ? ` · deep ${esc(dur(Math.round(aD)))}` : ''}${aR != null ? ` · REM ${esc(dur(Math.round(aR)))}` : ''} over ${have.length} nights.</p></div>`;
+}
 function openReadiness() {
   const r = readiness(viewDate);
   if (r.pending) return openSheet(`<h2>Readiness for training</h2><p class="muted">There is no sleep figure for ${esc(dayLabel(viewDate).toLowerCase())} yet. It appears once your watch has synced last night's sleep.</p><div class="row" style="margin-top:14px"><button class="btn day" id="rdOk">Close</button></div>`) || ($('rdOk').onclick = closeSheet);
@@ -664,6 +692,7 @@ function openReadiness() {
     ${r.flags.length ? `<div class="errbox">${r.capped ? 'The score is held at 5 because ' : 'Worth watching: '}${esc(r.flags.join(', '))}. These can come before an illness. Treat today as a lighter day.</div>` : ''}
     ${r.parts.map(p => `<div style="margin-top:12px"><div style="display:flex;justify-content:space-between;gap:8px"><b style="font-weight:600">${esc(p.name)}</b><span class="muted num">${Math.round(p.pts)} of 100 · ${Math.round(p.w / r.parts.reduce((a, q) => a + q.w, 0) * 100)}% of the score</span></div><div class="bar2"><i style="width:${Math.round(p.pts)}%"></i></div><div class="muted" style="font-size:13px;margin-top:3px">${esc(p.text)}. ${esc(p.hint)}</div></div>`).join('')}
     ${r.missing.length ? `<p class="muted" style="font-size:13px;margin-top:14px">Not included yet: ${esc(r.missing.join(', '))}${r.learning < 7 ? `. Your baseline needs at least 7 days of data (you have ${r.learning}).` : '. No figure for it today.'}</p>` : ''}
+    ${sleepChartHtml(viewDate)}
     <p class="muted" style="font-size:12px;margin-top:14px">A rule of thumb from your own numbers, not medical advice. If you feel unwell, listen to your body over this score.</p>
     <div class="row" style="margin-top:14px"><button class="btn day" id="rdOk">Close</button></div>`);
   $('rdOk').onclick = closeSheet;
@@ -800,9 +829,8 @@ function factsHtml(date) {
 }
 function suppCardHtml(date) {
   const r = S.reviews[date] || {}, list = suppList(), got = suppsTaken(r).filter(x => list.includes(x)).length, all = suppAll(r), st = suppStreak(date);
-  return `<div class="card supps"><div class="supphead"><h3>Supplements</h3><span class="muted num">${got}/${list.length}${st >= 2 ? ` · 🔥 ${st} days in a row` : ''}</span></div>
-    <div class="chips">${list.map(t => `<button class="chip sup ${suppsTaken(r).includes(t) ? 'on' : ''}" data-supp="${esc(t)}" aria-pressed="${suppsTaken(r).includes(t)}">${esc(t)}</button>`).join('')}</div>
-    <button class="btn suppall" data-supp-all="${all ? 'clear' : 'all'}">${all ? 'Clear all' : 'Took all'}</button></div>`;
+  return `<details class="card supps" id="suppDetails" ${suppOpen ? 'open' : ''}><summary class="suppsum"><span class="suppt"><b>Supplements</b> <span class="muted num">${got}/${list.length}${st >= 2 ? ` · 🔥 ${st}` : ''}</span></span><button class="btn suppall" data-supp-all="${all ? 'clear' : 'all'}">${all ? 'Clear all' : 'Took all'}</button><i class="layout-chevron">⌄</i></summary>
+    <div class="chips suppbody">${list.map(t => `<button class="chip sup ${suppsTaken(r).includes(t) ? 'on' : ''}" data-supp="${esc(t)}" aria-pressed="${suppsTaken(r).includes(t)}">${esc(t)}</button>`).join('')}</div></details>`;
 }
 function reviewHtml() {
   const r = S.reviews[reviewDate] || {}, tags = [...BASE_TAGS, ...S.tags];
@@ -812,20 +840,20 @@ function reviewHtml() {
       <span class="lbl2">Energy</span>
       <div class="scale">${[1, 2, 3, 4, 5].map(n => `<button data-energy="${n}" class="${r.energy === n ? 'on' : ''}">${n}</button>`).join('')}</div>
       <div class="scalehint"><span>drained</span><span>full of energy</span></div>
-      <div class="microw"><span class="lbl2">What happened</span><button class="mic" type="button" data-mic="did" aria-pressed="false">🎤 Dictate</button></div>
-      <textarea class="field" id="did" style="margin-top:0" placeholder="Meetings, workout, who you saw, anything worth remembering">${esc(r.did || '')}</textarea>
+      <span class="lbl2">What happened</span>
+      <div class="fw"><textarea class="field" id="did" style="margin-top:0" placeholder="Meetings, workout, who you saw, anything worth remembering">${esc(r.did || '')}</textarea><button class="mic mic-in" type="button" data-mic="did" aria-label="Dictate" aria-pressed="false">🎤</button></div>
       <div class="micstat" id="micStat-did"></div>
-      <div class="microw"><span class="lbl2">Best moment or one win</span><button class="mic" type="button" data-mic="win" aria-pressed="false">🎤 Dictate</button></div>
-      <input class="field" id="win" style="margin-top:0" value="${esc(r.win || '')}" placeholder="Optional"><div class="micstat" id="micStat-win"></div>
+      <span class="lbl2">Best moment or one win</span>
+      <div class="fw one"><input class="field" id="win" style="margin-top:0" value="${esc(r.win || '')}" placeholder="Optional"><button class="mic mic-in" type="button" data-mic="win" aria-label="Dictate" aria-pressed="false">🎤</button></div><div class="micstat" id="micStat-win"></div>
       <div class="saved" id="saved">${r.updatedAt ? 'Saved ✓' : ''}</div></div>
     ${suppCardHtml(reviewDate)}
-    <details class="card layout-review-details" id="reviewDetails" ${reviewDetailsOpen ? 'open' : ''}><summary><b>Details</b><span>Tags, sport, water & more <i class="layout-chevron">⌄</i></span></summary><div class="layout-details-body">      <span class="lbl2">Sport</span><p class="muted" style="font-size:12px">Completed activities select their sport automatically on the activity day. Plans and class calendar holds do not.</p>
+    <details class="card layout-review-details" id="reviewDetails" ${reviewDetailsOpen ? 'open' : ''}><summary><b>Details</b><span>Tags, sport, water & more <i class="layout-chevron">⌄</i></span></summary><div class="layout-details-body">      <span class="lblrow"><span class="lbl2">Sport</span>${infoHtml('sport', 'Completed activities select their sport automatically on the activity day. Plans and class calendar holds do not.')}</span>
       <div class="chips">${SPORT_TAGS.map(t => `<button class="chip ${(r.tags || []).includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}</div>
       <span class="lbl2">What was it about?</span>
       <div class="chips">${tags.map(t => `<button class="chip ${(r.tags || []).includes(t) ? 'on' : ''}" data-tag="${esc(t)}">${esc(t)}</button>`).join('')}<button class="chip" data-act="new-tag">+ tag</button></div>
       <span class="lbl2">Water, alcohol and other</span>
       ${trackHtml(reviewDate, true)}
-</div></details><p class="muted layout-review-note">Completed sports still fill in automatically.</p>
+</div></details>
     ${factsHtml(reviewDate)}
     ${r.updatedAt ? `<button class="btn" data-act="clear-review">Clear this day's review</button>` : ''}</div>`;
 }
@@ -865,7 +893,7 @@ function trackHtml(date, withSex, locked = lockedNow()) {
   return `<div class="cnt"><button class="big" data-cnt data-date="${date}" data-key="water" data-by="1" aria-label="Add a glass of water"><span>💧 Water</span><b class="num">${w}</b><small>${w ? `${w === 1 ? 'glass' : 'glasses'} · ${litres(w)} L` : 'tap to add a glass'}</small></button>${w ? `<button class="sm" data-cnt data-date="${date}" data-key="water" data-by="-1" aria-label="Remove a glass">−</button>` : ''}</div>
     ${locked ? '<button class="btn" data-act="lock-unlock" style="margin-top:8px">🔒 Unlock for alcohol, travel and illness</button>' : ''}${locked ? '' : tick('alcohol', 'Drinking alcohol')}
     ${!locked && drank(r) ? DRINKS.map(([k, l]) => { const n = (r.drinks || {})[k] || 0; return `<div class="drow"><span>${l}</span><button class="sm" data-cnt data-date="${date}" data-key="${k}" data-by="-1" ${n ? '' : 'disabled'} aria-label="One less ${l}">−</button><b class="num">${n}</b><button class="sm" data-cnt data-date="${date}" data-key="${k}" data-by="1" aria-label="One more ${l}">+</button></div>`; }).join('') + `<div class="muted" style="font-size:12px;margin:2px 2px 6px">${drinkTotal(r)} drink${drinkTotal(r) === 1 ? '' : 's'} in total</div>` : ''}
-    ${locked ? '' : tick('travel', 'Travelling') + tick('ill', 'Ill or injured') + (withSex ? tick('sex', 'Had sex') : '')}`;
+    ${locked ? '' : `<div class="tickgrid">${tick('travel', 'Travelling')}${tick('ill', 'Ill or injured')}${withSex ? tick('sex', 'Had sex') : ''}</div>`}`;
 }
 function bindReview(root) {
   root.querySelectorAll('[data-mood]').forEach(b => b.onclick = () => { const v = +b.dataset.mood, cur = (S.reviews[reviewDate] || {}).mood; patchReview({ mood: cur === v ? null : v }); render(); });
@@ -1031,8 +1059,9 @@ function settingsHtml() {
   const st = S.status, fmtAt = a => new Date(a).toLocaleString();
   const row = (label, s) => s ? `<div class="${s.ok ? 'okbox' : 'errbox'}"><b>${label}</b> ${fmtAt(s.at)}: ${s.ok ? 'OK' : ''}${s.message ? '<br>' + esc(s.message).replace(/\n/g, '<br>') : ''}</div>` : '';
   return `<button class="back" data-act="to-more">‹ More</button><div class="hd"><h1>Settings</h1></div><div class="stack set">
-    <div class="card"><h3>Connection</h3>
-      <p class="muted">Uses the same Worker as Calorie tracker. Calendar, Gmail and tasks come through it. Sleep and heart-rate figures use the Google Health connection you made in Calorie tracker.</p>
+    <div class="chips setjump">${SECTIONS.map(([i, t]) => `<button class="chip" data-jump="sec-${i}">${t}</button>`).join('')}</div>
+    ${secOpenTag('connection', 'Connection')}
+      <p class="muted">The same Worker as Calorie tracker. ${infoHtml('conn', 'Calendar, Gmail and tasks come through it. Sleep and heart-rate figures use the Google Health connection you made in Calorie tracker.')}</p>
       <label class="lbl2" for="baseUrl">Worker address</label>
       <input class="field" style="margin-top:0" id="baseUrl" inputmode="url" autocapitalize="off" value="${esc(S.settings.baseUrl)}" placeholder="https://calorie-tracker.yourname.workers.dev">
       <label class="lbl2" for="appKey">App key</label>
@@ -1044,26 +1073,26 @@ function settingsHtml() {
         <button class="btn" data-act="sync-all">Refresh everything</button>
       </div>
       <div id="checkOut"></div>
-      ${row('Calendar', st.cal)}${row('Tasks', st.tasks)}${row('Mail', st.mail)}${row('Health', st.health)}</div>
-    <div class="card"><h3>Display</h3>
+      ${row('Calendar', st.cal)}${row('Tasks', st.tasks)}${row('Mail', st.mail)}${row('Health', st.health)}</div></details>
+    ${secOpenTag('display', 'Display')}
       <span class="lbl2" style="margin-top:0">Theme</span>
       <div class="seg">${[['dark', 'Dark'], ['light', 'Light'], ['auto', 'Match phone']].map(([k, l]) => `<button data-theme-set="${k}" class="${S.settings.theme === k ? 'on' : ''}">${l}</button>`).join('')}</div>
       <span class="lbl2">Week strip on the Day tab</span>
       <div class="seg">${[[7, '7 days'], [5, 'Mon to Fri']].map(([k, l]) => `<button data-week-set="${k}" class="${S.settings.weekDays === k ? 'on' : ''}">${l}</button>`).join('')}</div>
-      <p class="muted" style="font-size:12px;margin-top:8px">Swipe left or right on the Day tab to move between days. A weekend day always shows the full week.</p></div>
-    <div class="card"><h3>Your tags</h3>
-      <p class="muted">Quick tags in the Review. Add your own from the Review tab; tap one of yours here to remove it.</p>
-      <div class="chips">${[...SPORT_TAGS, ...BASE_TAGS].map(t => `<span class="chip">${esc(t)}</span>`).join('')}${S.tags.map(t => `<button class="chip on" data-tagdel="${esc(t)}">${esc(t)} ✕</button>`).join('')}</div></div>
-    <div class="card"><h3>Your supplements</h3>
-      <p class="muted">The list on the Review tab. Tap one to remove it from the list; the days you already ticked keep it.</p>
-      <div class="chips">${suppList().map(t => `<button class="chip on" data-suppdel="${esc(t)}">${esc(t)} ✕</button>`).join('')}<button class="chip" data-act="supp-add">+ add</button></div></div>
-    <div class="card"><h3>Dictation</h3>
+      <p class="muted" style="font-size:12px;margin-top:4px">${infoHtml('week', 'Swipe left or right on the Day tab to move between days. A weekend day always shows the full week.')}</p></div></details>
+    ${secOpenTag('tags', 'Your tags')}
+      <p class="muted">Quick tags in the Review. ${infoHtml('tags', 'Add your own from the Review tab; tap one of yours here to remove it.')}</p>
+      <div class="chips">${[...SPORT_TAGS, ...BASE_TAGS].map(t => `<span class="chip">${esc(t)}</span>`).join('')}${S.tags.map(t => `<button class="chip on" data-tagdel="${esc(t)}">${esc(t)} ✕</button>`).join('')}</div></div></details>
+    ${secOpenTag('supps', 'Your supplements')}
+      <p class="muted">The list on the Review tab. ${infoHtml('supps', 'Tap one to remove it from the list; the days you already ticked keep it.')}</p>
+      <div class="chips">${suppList().map(t => `<button class="chip on" data-suppdel="${esc(t)}">${esc(t)} ✕</button>`).join('')}<button class="chip" data-act="supp-add">+ add</button></div></div></details>
+    ${secOpenTag('dictation', 'Dictation')}
       <label class="lbl2" for="dictLang" style="margin-top:0">Language you speak</label>
       <select class="field" style="margin-top:0" id="dictLang">${DICT_LANGS.map(([v, l]) => `<option value="${v}" ${(S.settings.dictLang || '') === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
-      <p class="muted" style="font-size:12px;margin:6px 0 0">The 🎤 button on the Review turns your voice into text. Chrome sends the audio to Google to do this; My Day keeps only the text. ${SpeechRec ? '' : '<b>This browser does not support it.</b>'}</p></div>
+      <p class="muted" style="font-size:12px;margin:6px 0 0">The 🎤 button on the Review turns your voice into text. Chrome sends the audio to Google to do this; My Day keeps only the text. ${SpeechRec ? '' : '<b>This browser does not support it.</b>'}</p></div></details>
     ${lockSettingsHtml()}
-    <div class="card"><h3>Shared backup (Notion)</h3>
-      <p class="muted">Saves My Day, and your other apps, into the Notion database <b>App backups</b> through your Pocket CRM service. It backs up by itself once a day when you open the app.</p>
+    ${secOpenTag('backup', 'Shared backup (Notion)')}
+      <p class="muted">Backs up by itself once a day. ${infoHtml('sb', 'Saves My Day, and your other apps, into the Notion database <b>App backups</b> through your Pocket CRM service.')}</p>
       <label class="lbl2" for="sbUrl">Pocket CRM address</label>
       <input class="field" style="margin-top:0" id="sbUrl" inputmode="url" autocapitalize="off" value="${esc(SharedBackup.url())}">
       <label class="lbl2" for="sbTok">Pocket CRM access token</label>
@@ -1071,16 +1100,16 @@ function settingsHtml() {
       <label class="tick"><input type="checkbox" id="sbHold" ${S.settings.backupHoldings ? 'checked' : ''}> Include my portfolio amounts</label>
       <div class="row" style="margin-top:8px;flex-wrap:wrap"><button class="btn day" data-act="sb-save">Back up now</button><button class="btn" data-act="sb-restore">Restore My Day</button><button class="btn" data-act="sb-refresh">Check</button></div>
       ${sbMsg ? `<div class="${sbMsg.ok ? 'okbox' : 'errbox'}" style="margin-top:10px">${esc(sbMsg.text)}</div>` : ''}
-      ${SharedBackup.configured() ? `<div class="kv" style="margin-top:10px">${Object.entries(SharedBackup.NAMES).map(([k, n]) => { const b = (sbList || []).find(x => x.app === k); const old = b && Date.now() - new Date(b.at).getTime() > 7 * 864e5; return `<span class="k">${n}</span><span style="${old || !b ? 'color:var(--warn)' : ''}">${sbList ? (b ? `${esc(SharedBackup.ago(b.at))} · ${b.size_kb} KB${b.device ? ' · ' + esc(b.device) : ''}` : 'no backup yet') : '…'}</span>`; }).join('')}</div><p class="muted" style="font-size:12px;margin:8px 0 0">Racket Rankings and Pocket CRM back themselves up from their own Settings or Data page. Restoring only adds what is missing or newer here; it never deletes.</p>` : ''}</div>
-    <div class="card"><h3>Your data</h3>
+      ${SharedBackup.configured() ? `<div class="kv" style="margin-top:10px">${Object.entries(SharedBackup.NAMES).map(([k, n]) => { const b = (sbList || []).find(x => x.app === k); const old = b && Date.now() - new Date(b.at).getTime() > 7 * 864e5; return `<span class="k">${n}</span><span style="${old || !b ? 'color:var(--warn)' : ''}">${sbList ? (b ? `${esc(SharedBackup.ago(b.at))} · ${b.size_kb} KB${b.device ? ' · ' + esc(b.device) : ''}` : 'no backup yet') : '…'}</span>`; }).join('')}</div><p class="muted" style="font-size:12px;margin:8px 0 0">Racket Rankings and Pocket CRM back themselves up from their own Settings or Data page. Restoring only adds what is missing or newer here; it never deletes.</p>` : ''}</div></details>
+    ${secOpenTag('data', 'Your data')}
       <p class="muted">Reviews and prep notes live on this device only. Export a backup now and then.</p>
       <div class="row" style="flex-wrap:wrap"><button class="btn" data-act="export">Export backup</button><button class="btn" data-act="import">Import backup</button>
       ${S.demo ? `<button class="btn" data-act="demo-off">Remove demo data</button>` : `<button class="btn" data-act="demo-on">Load demo data</button>`}</div>
-      <input type="file" id="importFile" accept="application/json" hidden></div>
-    <div class="card"><h3>About</h3>
+      <input type="file" id="importFile" accept="application/json" hidden></div></details>
+    ${secOpenTag('about', 'About')}
       <p class="muted">Build <b>${BUILD}</b> · <a href="privacy.html">Privacy policy</a></p>
       <button class="btn" data-act="force">Force refresh app</button>
-      <p class="muted" style="font-size:12px">Clears cached files and reloads. Your reviews are not touched.</p></div></div>`;
+      <p class="muted" style="font-size:12px">${infoHtml('force', 'Clears cached files and reloads. Your reviews are not touched.')}</p></div></details></div>`;
 }
 
 /* ---------- sheets ---------- */
@@ -1326,6 +1355,10 @@ function bind(root) {
   if (view === 'settings') { const f = $('importFile'); if (f) f.onchange = importData; bindLock(); const dl = $('dictLang'); if (dl) dl.onchange = () => { S.settings.dictLang = dl.value; save(); }; }
   const checkDetails = root.querySelector('#dayCheckDetails');
   if (checkDetails) checkDetails.ontoggle = () => { dayCheckOpen = checkDetails.open; };
+  const sDet = root.querySelector('#suppDetails'); if (sDet) sDet.ontoggle = () => { suppOpen = sDet.open; };
+  root.querySelectorAll('.setsec').forEach(d => d.ontoggle = () => { S.settings.secOpen = { ...(S.settings.secOpen || {}), [d.id]: d.open }; save(); });
+  root.querySelectorAll('[data-jump]').forEach(b => b.onclick = () => { const id = b.dataset.jump; S.settings.secOpen = { ...(S.settings.secOpen || {}), [id]: true }; save(); const el = $(id); if (el) { el.open = true; el.scrollIntoView({ block: 'start', behavior: 'smooth' }); } });
+  root.querySelectorAll('[data-info]').forEach(b => b.onclick = () => { const t = $('info-' + b.dataset.info); if (!t) return; t.hidden = !t.hidden; b.setAttribute('aria-expanded', String(!t.hidden)); });
   const optionalDetails = root.querySelector('#reviewDetails');
   if (optionalDetails) optionalDetails.ontoggle = () => { reviewDetailsOpen = optionalDetails.open; };
   root.querySelectorAll('summary [data-cnt]').forEach(b => b.addEventListener('click', e => e.preventDefault()));
@@ -1450,7 +1483,7 @@ const DICT_LANGS = [['', 'Phone language'], ['en-GB', 'English'], ['es-ES', 'Esp
 const mic = { on: false, rec: null, key: '', stop: false, started: 0 };
 const micField = k => $(k === 'did' ? 'did' : 'win');
 function micUi(msg) {
-  document.querySelectorAll('[data-mic]').forEach(b => { const on = mic.on && mic.key === b.dataset.mic; b.classList.toggle('rec', on); b.textContent = on ? '■ Stop' : '🎤 Dictate'; b.setAttribute('aria-pressed', String(on)); });
+  document.querySelectorAll('[data-mic]').forEach(b => { const on = mic.on && mic.key === b.dataset.mic; b.classList.toggle('rec', on); b.textContent = on ? '■' : '🎤'; b.setAttribute('aria-label', on ? 'Stop dictation' : 'Dictate'); b.setAttribute('aria-pressed', String(on)); });
   document.querySelectorAll('.micstat').forEach(e => { e.textContent = e.id === 'micStat-' + mic.key ? (msg || '') : ''; });
 }
 /** Adds spoken text at the end of the field: a space between, a capital letter at the start of a sentence. */
@@ -1483,6 +1516,17 @@ function micStart(key) {
   try { rec.start(); micUi('Listening…'); } catch { mic.on = false; micUi('Could not start the microphone.'); }
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && mic.on) micStop(); });
+
+
+/** A small ⓘ that shows or hides an explanation, so long notes do not take space until you want them. */
+const infoHtml = (id, text) => `<button type="button" class="infoi" data-info="${id}" aria-expanded="false" aria-label="More information">ⓘ</button><p class="infotxt muted" id="info-${id}" hidden>${text}</p>`;
+const secIsOpen = id => !!(S.settings.secOpen || {})[id];
+const SECTIONS = [['connection', 'Connection'], ['display', 'Display'], ['tags', 'Tags'], ['supps', 'Supplements'], ['dictation', 'Dictation'], ['lock', 'App lock'], ['backup', 'Backup'], ['data', 'Your data'], ['about', 'About']];
+function secSummary(id) {
+  const ago = () => { const l = SharedBackup.lastOk(); return l ? SharedBackup.ago(new Date(l).toISOString()) : 'not yet'; };
+  return { connection: connected() ? 'Connected' : 'Not connected', display: S.settings.theme === 'light' ? 'Light' : S.settings.theme === 'auto' ? 'Match phone' : 'Dark', tags: String(S.tags.length + SPORT_TAGS.length + BASE_TAGS.length), supps: String(suppList().length), dictation: (DICT_LANGS.find(x => x[0] === (S.settings.dictLang || '')) || DICT_LANGS[0])[1], lock: lockEnabled() ? 'On' : 'Off', backup: SharedBackup.configured() ? ago() : 'Not set up', data: '', about: BUILD }[id] || '';
+}
+const secOpenTag = (id, title) => `<details class="card setsec" id="sec-${id}" ${secIsOpen('sec-' + id) ? 'open' : ''}><summary><b>${title}</b><span class="muted">${esc(secSummary(id))}</span><i class="layout-chevron">⌄</i></summary><div class="secbody">`;
 
 /* ---------- fingerprint lock (Review, History, Portfolio and the private counters) ---------- */
 // The phone's own fingerprint or screen lock through WebAuthn. It keeps people who pick up your unlocked phone out of these screens;
@@ -1523,12 +1567,12 @@ function lockScreenHtml(v) {
 }
 function lockSettingsHtml() {
   const on = lockEnabled();
-  return `<div class="card"><h3>App lock</h3>
+  return `${secOpenTag('lock', 'App lock')}
       <label class="tick"><input type="checkbox" id="lockOn" ${on ? 'checked' : ''} ${lockSupported === false && !on ? 'disabled' : ''}> Lock Review, History and Portfolio with my fingerprint</label>
       <p class="muted" style="font-size:12px;margin:2px 0 6px">${lockSupported === false && !on ? 'This phone has no fingerprint or screen lock that the app can use. Set one up in the phone\'s settings first.' : 'Also hides alcohol, travel and illness on the Day screen and the portfolio line. The Day, Sports and More screens stay open.'}</p>
       ${on ? `<label class="lbl2" for="lockMins">Lock again after leaving the app for</label><select class="field" style="margin-top:0" id="lockMins">${[[0, 'At once'], [5, '5 minutes'], [15, '15 minutes'], [60, '1 hour']].map(([n, l]) => `<option value="${n}" ${lockMinutes() === n ? 'selected' : ''}>${l}</option>`).join('')}</select>
       <div class="row" style="margin-top:8px;flex-wrap:wrap"><button class="btn" data-act="lock-now">🔒 Lock now</button><button class="btn" data-act="lock-reset">Can't unlock? Remove the lock</button></div>` : ''}
-      ${lockMsg && view === 'settings' ? `<p class="muted" style="font-size:13px;margin:6px 0 0">${esc(lockMsg)}</p>` : ''}</div>`;
+      ${lockMsg && view === 'settings' ? `<p class="muted" style="font-size:13px;margin:6px 0 0">${esc(lockMsg)}</p>` : ''}</div></details>`;
 }
 function bindLock() {
   const on = $('lockOn'); if (!on) return;
