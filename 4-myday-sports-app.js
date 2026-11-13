@@ -1,6 +1,6 @@
 
 'use strict';
-const BUILD = '2026-11-13.layout4';
+const BUILD = '2026-11-13.quickadd1';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -433,6 +433,7 @@ const LAYOUT_STYLES = `<style>
 .supps{padding:0}.supps summary{list-style:none;display:flex;align-items:center;gap:10px;min-height:56px;padding:6px 14px;cursor:pointer}.supps summary::-webkit-details-marker{display:none}.suppt{flex:1;min-width:0}.supps .suppall{margin:0;min-height:44px;width:auto;padding:8px 14px;flex:none}.supps[open] .layout-chevron{transform:rotate(180deg)}.supps .suppbody{padding:0 14px 14px}
 .setjump{margin:0 0 4px}.setjump .chip{min-height:40px}.setsec{padding:0;scroll-margin-top:8px}.setsec summary{list-style:none;display:flex;align-items:center;gap:10px;min-height:56px;padding:8px 14px;cursor:pointer}.setsec summary::-webkit-details-marker{display:none}.setsec summary b{flex:1;font-size:16px}.setsec summary .muted{font-size:13px;text-align:right}.setsec[open] summary .layout-chevron{transform:rotate(180deg)}.secbody{padding:0 14px 14px}
 .sleepchart{margin-top:14px}.sleepchart svg{width:100%;height:auto;display:block}.sleepkey{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:4px}.sleepkey i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+.qaprev{margin-top:12px;padding:12px 14px}.qaprev .seg{margin-bottom:10px}.qat{font-size:17px;font-weight:600;overflow-wrap:anywhere}.qaw{margin-top:4px;font-size:14px}
 .lockbox{text-align:center;padding:30px 18px}.lockbox .big{font-size:38px}
 </style>`;
 let suppOpen = false, trayAll = false, dayCheckOpen = false, reviewDetailsOpen = false;
@@ -443,7 +444,7 @@ function render() {
   $('nav').querySelectorAll('button').forEach(b => b.onclick = () => go(b.dataset.v));
   $('fabslot').innerHTML = view === 'today' ? '<button class="fab" data-act="fab" aria-label="Add">+</button>' : '';
   const app = $('app');
-  if (mic.on && view !== 'review') micStop();
+  if (mic.on && mic.key !== 'qa' && view !== 'review') micStop();
   const locked = viewLocked(view);
   app.innerHTML = LAYOUT_STYLES + (locked ? lockScreenHtml(view) : { today: dayHtml, inbox: inboxHtml, review: reviewHtml, more: moreHtml, history: historyHtml, settings: settingsHtml, portfolio: portfolioHtml, sports: sportsHtml }[view]());
   if (locked && lockTried !== view) { lockTried = view; setTimeout(lockUnlock, 50); } else if (!locked) lockTried = '';
@@ -1117,7 +1118,7 @@ function openSheet(html) {
   $('overlay').innerHTML = `<div class="scrim" id="scrim"><div class="sheet" role="dialog">${html}</div></div>`;
   $('scrim').onclick = e => { if (e.target.id === 'scrim') closeSheet(); };
 }
-function closeSheet() { $('overlay').innerHTML = ''; }
+function closeSheet() { if (mic.on && mic.key === 'qa') micStop(); $('overlay').innerHTML = ''; }
 function findEvent(key) {
   for (const c of Object.values(S.cache)) { const e = c.events.find(x => evKey(x) === key); if (e) return e; }
   return null;
@@ -1217,7 +1218,7 @@ function findTask(id) {
 }
 function openAddTask(o = {}) {
   const person = o.person;
-  let due = viewDate >= today() ? viewDate : today(), type = '';
+  let due = o.date || (viewDate >= today() ? viewDate : today()), type = '';
   const draw = () => {
     $('dueChips').innerHTML = [[today(), 'Today'], [addDays(today(), 1), 'Tomorrow'], ['', 'No date']].map(([d, l]) => `<button class="chip ${due === d ? 'on' : ''}" data-d="${d}">${l}</button>`).join('');
     $('typeChips').innerHTML = [['', 'None'], ['Personal', 'Personal'], ['Work', 'Work']].map(([v, l]) => `<button class="chip ${type === v ? 'on' : ''}" data-t="${v}">${l}</button>`).join('');
@@ -1267,18 +1268,19 @@ function openEventForm(o = {}) {
   let startMin = o.startMin != null ? o.startMin : (base === today() ? Math.ceil((nowM + 5) / 30) * 30 : 9 * 60);
   startMin = Math.max(0, Math.min(startMin, 23 * 60 + 30));
   const t = m => hm(Math.min(m, 1439));
+  const endMin0 = o.endMin != null ? o.endMin : startMin + 60;
   openSheet(`<h2>New event</h2><p class="muted" style="margin:2px 0 4px">Added to your Google Calendar.</p>
     <input class="field" id="evTitle" placeholder="Title" maxlength="200" value="${esc(o.title || '')}" autofocus>
     <label class="ck2"><input type="checkbox" id="evAll"> All day</label>
     <div class="row"><input class="field" type="date" id="evDate" value="${base}"><input class="field" type="date" id="evDate2" value="${base}" hidden></div>
-    <div class="row" id="evTimes"><input class="field" type="time" id="evStart" value="${t(startMin)}"><input class="field" type="time" id="evEnd" value="${t(startMin + 60)}"></div>
+    <div class="row" id="evTimes"><input class="field" type="time" id="evStart" value="${t(startMin)}"><input class="field" type="time" id="evEnd" value="${t(endMin0)}"></div>
     <input class="field" id="evWhere" placeholder="Where (optional)">
     <input class="field" id="evGuests" placeholder="Guests: email addresses separated by commas (optional)" inputmode="email">
     <div class="mu" id="evGuestNote" hidden style="margin:6px 2px 0">Guests get a calendar invitation when you save.</div>
     <label class="ck2"><input type="checkbox" id="evMeet"> Add a Google Meet link</label>
     <div class="row" style="margin-top:16px"><button class="btn day" id="evSave">Add to calendar</button><button class="btn" id="evCancel">Cancel</button></div>`);
   const mins = v => { const [h, m] = (v || '0:0').split(':').map(Number); return h * 60 + m; };
-  let span = 60;
+  let span = Math.max(15, endMin0 - startMin);
   $('evStart').onchange = () => { $('evEnd').value = t(mins($('evStart').value) + span); };
   $('evEnd').onchange = () => { span = Math.max(15, mins($('evEnd').value) - mins($('evStart').value)); };
   $('evAll').onchange = () => { const a = $('evAll').checked; $('evTimes').hidden = a; $('evDate2').hidden = !a; };
@@ -1310,10 +1312,12 @@ function openEventForm(o = {}) {
 }
 function openFabMenu() {
   openSheet(`<h2>Add</h2>
+    <button class="menu" id="fSay"><i>🎤</i><span>Say or type it<small>“Call the bank tomorrow at 4”</small></span></button>
     <button class="menu" id="fEv"><i>▦</i><span>New event<small>On your Google Calendar</small></span></button>
     <button class="menu" id="fTask"><i>☑</i><span>New task<small>In your Notion task database</small></span></button>
     <button class="menu" id="fNote"><i>✎</i><span>New meeting note<small>In your Notion Meetings database</small></span></button>
     <a class="menu" href="${MEETINGS_DB_URL}" target="_blank" rel="noopener"><i>▤</i><span>Open Meetings database<small>In Notion</small></span></a>`);
+  $('fSay').onclick = () => { closeSheet(); openQuickAdd(); };
   $('fEv').onclick = () => { closeSheet(); openEventForm(); };
   $('fTask').onclick = () => { closeSheet(); openAddTask(); };
   $('fNote').onclick = () => { closeSheet(); startMeetingNote({ title: 'Meeting', start: new Date().toISOString() }); };
@@ -1476,12 +1480,153 @@ function toast(msg, label, fn) {
 
 
 
+
+/* ---------- quick add: one spoken or typed sentence becomes a task or an event ---------- */
+// Everything is worked out on the phone with plain rules: no service, no cost. English first, with the basics of Spanish and German.
+const QA_DAYS = { sunday: 0, sun: 0, monday: 1, mon: 1, tuesday: 2, tue: 2, tues: 2, wednesday: 3, wed: 3, thursday: 4, thu: 4, thur: 4, thurs: 4, friday: 5, fri: 5, saturday: 6, sat: 6, domingo: 0, lunes: 1, martes: 2, 'miércoles': 3, miercoles: 3, jueves: 4, viernes: 5, 'sábado': 6, sabado: 6, sonntag: 0, montag: 1, dienstag: 2, mittwoch: 3, donnerstag: 4, freitag: 5, samstag: 6 };
+const QA_MONTHS = { january: 1, jan: 1, february: 2, feb: 2, march: 3, mar: 3, april: 4, apr: 4, may: 5, june: 6, jun: 6, july: 7, jul: 7, august: 8, aug: 8, september: 9, sept: 9, sep: 9, october: 10, oct: 10, november: 11, nov: 11, december: 12, dec: 12 };
+const QA_EVENT_WORDS = /\b(lunch|dinner|breakfast|brunch|coffee|meeting|meet|call with|appointment|drinks|session|class|match|game|training|interview|flight|visit|party|concert|dentist|doctor|haircut|workshop|webinar|catch ?up|1:1)\b/i;
+function parseQuick(text, now = new Date()) {
+  const raw = String(text || '').replace(/\s+/g, ' ').trim(), l = raw.toLowerCase();
+  const cut = [], out = { kind: 'task', title: '', date: '', time: '', end: '', dur: 0, foundDate: false, foundTime: false, assumed: '' };
+  const free = m => !cut.some(([a, b]) => m.index < b && m.index + m[0].length > a);
+  const find = re => { const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g'); let m; while ((m = g.exec(l))) { if (free(m)) return m; if (m[0].length === 0) g.lastIndex++; } return null; };
+  const take = m => { cut.push([m.index, m.index + m[0].length]); return m; };
+  const d0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()), dow0 = d0.getDay();
+  const plus = n => { const d = new Date(d0); d.setDate(d.getDate() + n); return ymd(d); };
+  const pad = n => String(n).padStart(2, '0');
+  const hint = /\b(morning|am\b)/.test(l) ? 'am' : /\b(afternoon|evening|tonight|night)\b/.test(l) ? 'pm' : '';
+  const to24 = (h, mer, hnt = hint) => { if (mer === 'pm') return h === 12 ? 12 : h + 12; if (mer === 'am') return h === 12 ? 0 : h; if (h >= 13 || h === 0) return h % 24; if (hnt === 'pm') return h === 12 ? 12 : h + 12; if (hnt === 'am') return h === 12 ? 0 : h; return h >= 1 && h <= 7 ? h + 12 : h; };
+  const setTime = (h, m) => { if (h > 23 || m > 59) return false; out.time = `${pad(h)}:${pad(m || 0)}`; out.foundTime = true; return true; };
+  let m;
+  // how long
+  if ((m = find(/\bfor\s+(?:(half an?|an?|one)|(\d+(?:[.,]\d+)?))\s*(hours?|hrs?|h|minutes?|mins?)\b/))) {
+    take(m); const hour = /^h/.test(m[3]), n = m[1] ? (/half/.test(m[1]) ? 0.5 : 1) : parseFloat(m[2].replace(',', '.'));
+    out.dur = Math.max(5, Math.round(n * (hour ? 60 : 1)));
+  }
+  // a range: "1 to 2pm", "from 13:00 to 14:30"
+  if ((m = find(/\b(from\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:-|–|to|until|till)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b/)) && (m[1] || m[3] || m[6] || m[4] || m[7])) {
+    take(m); let m1 = m[4], m2 = m[7]; const h1r = +m[2], h2r = +m[5];
+    let h2 = to24(h2r, m2), h1 = to24(h1r, m1 || m2 || '', m1 || m2 ? (m1 || m2) : hint);
+    if (!m1 && m2 === 'pm' && h1 > h2) h1 = to24(h1r, 'am');
+    if (setTime(h1, +(m[3] || 0))) { const e = h2 * 60 + +(m[6] || 0), s0 = h1 * 60 + +(m[3] || 0); out.dur = e > s0 ? e - s0 : 60; }
+  }
+  // "in 2 hours", "in 30 minutes"
+  if (!out.foundTime && (m = find(/\bin\s+(?:(an?|half an?)|(\d+(?:[.,]\d+)?))\s*(hours?|hrs?|minutes?|mins?)\b/))) {
+    take(m); const hour = /^h/.test(m[3]), n = m[1] ? (/half/.test(m[1]) ? 0.5 : 1) : parseFloat(m[2].replace(',', '.'));
+    const t = new Date(now.getTime() + n * (hour ? 60 : 1) * 60000), r5 = Math.ceil((t.getHours() * 60 + t.getMinutes()) / 5) * 5;
+    out.date = ymd(new Date(t.getFullYear(), t.getMonth(), t.getDate())); out.foundDate = true; setTime(Math.floor(r5 / 60) % 24, r5 % 60);
+  }
+  // a clock time
+  if (!out.foundTime && (m = find(/\b(half past|quarter past|quarter to)\s+(\d{1,2})\b/))) {
+    take(m); let h = to24(+m[2], '', hint); if (/to/.test(m[1])) { h = (h + 23) % 24; setTime(h, 45); } else setTime(h, /half/.test(m[1]) ? 30 : 15);
+  }
+  if (!out.foundTime && (m = find(/\b(noon|midday|midnight)\b/))) { take(m); setTime(/midnight/.test(m[1]) ? 0 : 12, 0); }
+  if (!out.foundTime && (m = find(/\b(?:at|@|around|by|um|a las?)\s+(\d{1,2})(?:[:.h](\d{2}))?\s*(am|pm|uhr|h)?(?![\d])/))) { take(m); setTime(to24(+m[1], /^(am|pm)$/.test(m[3] || '') ? m[3] : ''), +(m[2] || 0)); }
+  if (!out.foundTime && (m = find(/\b(\d{1,2}):(\d{2})\s*(am|pm)?\b/))) { take(m); setTime(to24(+m[1], m[3] || ''), +m[2]); }
+  if (!out.foundTime && (m = find(/\b(\d{1,2})\s*(am|pm|uhr)\b/))) { take(m); setTime(to24(+m[1], /^(am|pm)$/.test(m[2]) ? m[2] : ''), 0); }
+  if (!out.foundTime && (m = find(/\b(\d{1,2})\s*o'?clock\b/))) { take(m); setTime(to24(+m[1], ''), 0); }
+  // a day
+  if ((m = find(/\b(?:on\s+)?(day after tomorrow|pasado ma[ñn]ana|[üu]bermorgen|tomorrow|tmrw|tmr|ma[ñn]ana|morgen|tonight|today|hoy|heute)\b/))) {
+    take(m); const w = m[1]; out.date = /after|pasado|bermorgen/.test(w) ? plus(2) : /^(tomorrow|tmrw|tmr|ma|morgen)/.test(w) ? plus(1) : plus(0); out.foundDate = true;
+  }
+  if (!out.foundDate && (m = find(/\bin\s+(\d+)\s+(days?|weeks?)\b/))) { take(m); out.date = plus(+m[1] * (/^w/.test(m[2]) ? 7 : 1)); out.foundDate = true; }
+  if (!out.foundDate && (m = find(/\bnext week\b/))) { take(m); out.date = plus(7 - ((dow0 + 6) % 7)); out.foundDate = true; }
+  if (!out.foundDate && (m = find(/\b(?:this\s+)?weekend\b/))) { take(m); out.date = plus((6 - dow0 + 7) % 7 || 0); out.foundDate = true; }
+  if (!out.foundDate && (m = find(/\b(?:(next|this|coming|on|el|am)\s+)?(sunday|sun|monday|mon|tuesday|tues|tue|wednesday|wed|thursday|thurs|thur|thu|friday|fri|saturday|sat|domingo|lunes|martes|mi[ée]rcoles|jueves|viernes|s[áa]bado|sonntag|montag|dienstag|mittwoch|donnerstag|freitag|samstag)\b/))) {
+    take(m); const dw = QA_DAYS[m[2]], diff = (dw - dow0 + 7) % 7;
+    out.date = m[1] === 'next' ? plus(7 - ((dow0 + 6) % 7) + ((dw + 6) % 7)) : plus(m[1] === 'this' ? diff : (diff === 0 ? 7 : diff)); out.foundDate = true;
+  }
+  if (!out.foundDate && (m = find(/\b(\d{4})-(\d{2})-(\d{2})\b/))) { take(m); out.date = m[0]; out.foundDate = true; }
+  const monthRe = Object.keys(QA_MONTHS).sort((a, b) => b.length - a.length).join('|');
+  const fromDM = (d, mo, y) => { let yr = y ? (y < 100 ? 2000 + y : y) : d0.getFullYear(); let dt = new Date(yr, mo - 1, d); if (dt.getMonth() !== mo - 1) return ''; if (!y && dt < d0) dt = new Date(yr + 1, mo - 1, d); return ymd(dt); };
+  if (!out.foundDate && (m = find(new RegExp('\\b(?:on\\s+)?(?:the\\s+)?(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?(' + monthRe + ')\\b')))) { const v = fromDM(+m[1], QA_MONTHS[m[2]]); if (v) { take(m); out.date = v; out.foundDate = true; } }
+  if (!out.foundDate && (m = find(new RegExp('\\b(?:on\\s+)?(' + monthRe + ')\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b')))) { const v = fromDM(+m[2], QA_MONTHS[m[1]]); if (v) { take(m); out.date = v; out.foundDate = true; } }
+  if (!out.foundDate && (m = find(/\b(\d{1,2})[\/.](\d{1,2})(?:[\/.](\d{2,4}))?\b/))) { const v = fromDM(+m[1], +m[2], m[3] ? +m[3] : 0); if (v) { take(m); out.date = v; out.foundDate = true; } }
+  if (!out.foundDate && (m = find(/\bthe\s+(\d{1,2})(?:st|nd|rd|th)\b/))) {
+    take(m); let dt = new Date(d0.getFullYear(), d0.getMonth(), +m[1]); if (dt < d0) dt = new Date(d0.getFullYear(), d0.getMonth() + 1, +m[1]); out.date = ymd(dt); out.foundDate = true;
+  }
+  // a part of the day, when no clock time was said
+  if (!out.foundTime && (m = find(/\b(?:in the |this )?(morning|afternoon|evening)\b|\btonight\b/))) {
+    take(m); const w = m[1] || 'tonight'; setTime(w === 'morning' ? 9 : w === 'afternoon' ? 15 : w === 'evening' ? 19 : 20, 0); out.foundTime = true;
+  }
+  // defaults, so the preview is always a complete answer
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  if (!out.foundDate) {
+    out.date = plus(0);
+    if (out.foundTime) { const [h, mi] = out.time.split(':').map(Number); if (h * 60 + mi <= nowMin) { out.date = plus(1); out.assumed = 'That time has passed today, so tomorrow.'; } }
+    else out.assumed = 'No day said, so today.';
+  }
+  // title: what is left once the dates and times are taken out
+  let title = raw;
+  if (l.length === raw.length && cut.length) { const merged = cut.slice().sort((a, b) => a[0] - b[0]).reduce((acc, c) => { const last = acc[acc.length - 1]; if (last && c[0] <= last[1] + 1) last[1] = Math.max(last[1], c[1]); else acc.push([...c]); return acc; }, []); title = ''; let at = 0; for (const [a, b] of merged) { title += raw.slice(at, a) + ' '; at = b; } title += raw.slice(at); }
+  title = title.replace(/\s+/g, ' ').trim();
+  let kindWord = '';
+  title = title.replace(/^(?:please\s+)?(?:remind me to|remind me|i need to|i have to|i should|don'?t forget to|add (?:a |an )?(task|event|meeting)(?: to| for| called)?|new (task|event|meeting)|create (?:a |an )?(task|event|meeting)|schedule (?:a |an )?(event|meeting)?|(task|event|todo|to-do)\s*[:,-]?|put (?:a |an )?(task|event))\s*/i, (_, ...g) => { kindWord = (g.slice(0, 7).find(x => /^(task|event|meeting|todo|to-do)$/i.test(x || '')) || (/^schedule/i.test(_) ? 'event' : '')).toLowerCase(); return ''; });
+  for (let i = 0; i < 3; i++) title = title.replace(/(?:^|\s)(?:at|on|in|by|for|from|to|until|till|around|um|am|el|a las?|this|next|coming)$/i, '').replace(/^(?:at|on|in|by|for|from|to|until|till|around)\s+/i, '').trim();
+  title = title.replace(/[\s,.;:-]+$/, '').trim();
+  out.title = title ? title[0].toUpperCase() + title.slice(1) : '';
+  // task or event?
+  out.kind = /^(event|meeting)$/.test(kindWord) ? 'event' : /^(task|todo|to-do)$/.test(kindWord) ? 'task' : (out.dur || (out.foundTime && QA_EVENT_WORDS.test(raw))) ? 'event' : 'task';
+  if (out.kind === 'event') { if (!out.foundTime) { out.time = '09:00'; } const [h, mi] = out.time.split(':').map(Number), e = h * 60 + mi + (out.dur || 60); out.end = `${pad(Math.min(23, Math.floor(e / 60)))}:${pad(e >= 1440 ? 59 : e % 60)}`; if (!out.foundTime) out.assumed = (out.assumed ? out.assumed + ' ' : '') + 'No time said, so 09:00.'; }
+  return out;
+}
+const qa = { kind: 'task', forced: false };
+const qaWhen = r => `${shortDate(r.date)}${r.kind === 'event' ? ` · ${r.time}–${r.end}` : r.foundTime ? ` · ${r.time}` : ''}`;
+function quickRefresh() {
+  const el = $('qaText'), box = $('qaPrev'); if (!el || !box) return;
+  const r = parseQuick(el.value); if (!qa.forced) qa.kind = r.kind; else { r.kind = qa.kind; if (r.kind === 'event' && !r.end) { const [h, mi] = (r.time || '09:00').split(':').map(Number), e = h * 60 + mi + (r.dur || 60); r.time = r.time || '09:00'; r.end = hm(Math.min(e, 1439)); } }
+  qa.r = r;
+  if (!r.title) { box.innerHTML = '<p class="muted" style="margin:12px 2px 0">Say or type what you want to add.</p>'; $('qaAdd').disabled = true; $('qaMore').disabled = true; return; }
+  box.innerHTML = `<div class="card qaprev"><div class="seg">${[['task', 'Task'], ['event', 'Event']].map(([k, t]) => `<button type="button" data-qk="${k}" class="${r.kind === k ? 'on' : ''}">${t}</button>`).join('')}</div>
+    <div class="qat">${esc(r.title)}</div><div class="muted qaw">📅 ${esc(qaWhen(r))}</div>${r.assumed ? `<div class="muted" style="font-size:12px;margin-top:4px">${esc(r.assumed)}</div>` : ''}</div>`;
+  box.querySelectorAll('[data-qk]').forEach(b => b.onclick = () => { qa.kind = b.dataset.qk; qa.forced = true; quickRefresh(); });
+  $('qaAdd').textContent = r.kind === 'event' ? 'Add event' : 'Add task'; $('qaAdd').disabled = false; $('qaMore').disabled = false;
+}
+async function createTaskNow({ title, date, time }) {
+  if (S.tasks === null) S.tasks = { at: Date.now(), open: [], doneOn: {} };
+  if (S.demo) { S.tasks.open.push({ id: 'demo-' + Date.now(), title, status: 'Not started', due: time ? `${date}T${time}:00` : date, done: null, types: [], tags: [], waiting: false, crm: false, people: [], next: '', url: '#' }); save(); return { timed: !!time }; }
+  let r, timed = !!time;
+  try { r = await post('/api/tasks/add', { title, due: time ? `${date}T${time}:00` : date }); }
+  catch (e) { if (!time) throw e; timed = false; r = await post('/api/tasks/add', { title, due: date, notes: `Time: ${time}` }); } // the service only takes a day: keep the time in the notes
+  S.tasks.open.push(r.task); save(); return { timed };
+}
+async function createEventNow({ title, date, time, end }) {
+  const s0 = new Date(`${date}T${time}`), e0 = new Date(`${date}T${end}`);
+  if (isNaN(s0) || isNaN(e0) || e0 <= s0) throw new Error('The end time must be after the start.');
+  const body = { title, guests: [], meet: false, start: s0.toISOString(), end: e0.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+  if (S.demo) {
+    const c = S.cache[date] || (S.cache[date] = { at: Date.now(), events: [], calendars: [], errors: [] });
+    c.events.push({ id: 'demo-' + Date.now(), uid: 'demo-' + Date.now(), calendar: 'Demo', title, start: body.start, end: body.end, allDay: false, location: '', description: '', video: null, link: null, response: 'accepted', busy: true, organizer: '', attendees: [], attendeeCount: 0 });
+    c.events.sort((a, b) => (b.allDay - a.allDay) || (Date.parse(a.start) - Date.parse(b.start))); save();
+  } else await post('/api/calendar/add', body);
+}
+function openQuickAdd(text = '') {
+  qa.kind = 'task'; qa.forced = false;
+  openSheet(`<h2>Say or type it</h2><p class="muted" style="margin:2px 0 8px">Tap 🎤 and say it, for example “call the bank tomorrow at 4” or “lunch with Tom Friday 1pm”.</p>
+    <div class="fw"><textarea class="field" id="qaText" rows="2" style="margin-top:0" placeholder="What do you want to add?">${esc(text)}</textarea><button class="mic mic-in" type="button" id="qaMic" data-mic="qa" aria-label="Dictate" aria-pressed="false">🎤</button></div>
+    <div class="micstat" id="micStat-qa"></div><div id="qaPrev"></div>
+    <div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn day" id="qaAdd" disabled>Add task</button><button class="btn" id="qaMore" disabled>More options</button><button class="btn" id="qaCancel">Cancel</button></div>`);
+  $('qaText').oninput = quickRefresh; $('qaMic').onclick = () => micStart('qa'); $('qaCancel').onclick = closeSheet;
+  $('qaMore').onclick = () => { const r = qa.r; closeSheet(); if (!r) return; if (r.kind === 'event') { const [h, mi] = r.time.split(':').map(Number), [h2, mi2] = r.end.split(':').map(Number); openEventForm({ title: r.title, date: r.date, startMin: h * 60 + mi, endMin: h2 * 60 + mi2 }); } else openAddTask({ title: r.title, date: r.date, notes: r.foundTime ? `Time: ${r.time}` : undefined }); };
+  $('qaAdd').onclick = async () => {
+    const r = qa.r; if (!r || !r.title) return; $('qaAdd').disabled = true;
+    try {
+      if (micOn()) micStop();
+      if (r.kind === 'event') { await createEventNow(r); closeSheet(); toast(`Event added · ${qaWhen(r)}`); viewDate = r.date; if (S.demo) render(); else await loadDay(r.date); }
+      else { const t = await createTaskNow({ title: r.title, date: r.date, time: r.foundTime ? r.time : '' }); closeSheet(); toast(`Task added · ${shortDate(r.date)}${r.foundTime ? (t.timed ? ' ' + r.time : ' (time in the notes)') : ''}`); render(); }
+    } catch (e) { $('qaAdd').disabled = false; toast('Could not add: ' + e.message); }
+  };
+  quickRefresh(); $('qaText').focus();
+}
+const micOn = () => mic.on;
+
 /* ---------- dictation: speak instead of typing (Review: What happened, Best moment) ---------- */
 // Chrome's own speech recognition. It sends the audio to Google to make the text; My Day keeps only the text.
 const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
 const DICT_LANGS = [['', 'Phone language'], ['en-GB', 'English'], ['es-ES', 'Español'], ['de-DE', 'Deutsch']];
 const mic = { on: false, rec: null, key: '', stop: false, started: 0 };
-const micField = k => $(k === 'did' ? 'did' : 'win');
+const micField = k => $(k === 'did' ? 'did' : k === 'qa' ? 'qaText' : 'win');
 function micUi(msg) {
   document.querySelectorAll('[data-mic]').forEach(b => { const on = mic.on && mic.key === b.dataset.mic; b.classList.toggle('rec', on); b.textContent = on ? '■' : '🎤'; b.setAttribute('aria-label', on ? 'Stop dictation' : 'Dictate'); b.setAttribute('aria-pressed', String(on)); });
   document.querySelectorAll('.micstat').forEach(e => { e.textContent = e.id === 'micStat-' + mic.key ? (msg || '') : ''; });
@@ -1491,7 +1636,7 @@ function micInsert(key, text) {
   const el = micField(key), t0 = text.trim(); if (!el || !t0) return;
   const cur = el.value, sep = !cur || /\s$/.test(cur) ? '' : ' ', cap = !cur.trim() || /[.!?]\s*$/.test(cur.trim());
   el.value = cur + sep + (cap ? t0[0].toUpperCase() + t0.slice(1) : t0);
-  patchReview({ [key]: el.value });
+  if (key === 'qa') quickRefresh(); else patchReview({ [key]: el.value });
 }
 function micStop() { mic.stop = true; mic.on = false; try { mic.rec && mic.rec.stop(); } catch { /* already stopped */ } micUi(''); }
 function micStart(key) {
