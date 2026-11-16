@@ -425,6 +425,7 @@ const LAYOUT_STYLES = `<style>
 .task .chk{position:relative}.task .chk::after{content:'';position:absolute;inset:-8px}.wk .ar{min-width:40px;min-height:40px}.mini{min-height:36px}
 .layout-more-grid .menu{gap:10px}.layout-more-grid .menu i{display:block;flex:none;width:24px;margin-top:1px;font-size:20px;line-height:1.1;font-style:normal;text-align:center}
 .layout-checkin summary{flex-wrap:wrap;row-gap:8px}.layout-checkin summary .ckline{order:1}.layout-checkin summary .layout-chevron{order:2;min-width:32px;text-align:center}.layout-checkin summary .ckbtns{order:3;flex:0 0 100%;display:flex;gap:12px}.ckbtn{flex:1 1 0;min-width:0;min-height:48px;border:1px solid var(--line);background:var(--card);border-radius:12px;font-size:15px;font-weight:600;padding:8px 10px}.layout-checkin summary .layout-water.ckbtn{flex:1 1 0;min-height:48px;padding:8px 10px;border:1px solid var(--line);background:var(--card)}
+.rdchk{padding:4px 12px 10px}.rdchk .muted{font-size:12px;margin:0 0 8px}.rdchk-btns{display:flex;gap:8px}.rdchk-btns .ckbtn{font-size:13px;min-height:44px;padding:6px 4px}.rdchk .field{margin-top:8px;width:100%;min-width:0}.rdchk.done{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 12px 2px}.rdchk.done .muted{margin:0;font-size:12px}
 .sm{min-width:52px;height:48px}.drow{gap:12px;padding:6px 2px}.tick{min-height:48px}.tick input{width:26px;height:26px}.cnt .big{min-height:56px}
 .chip.sup{min-height:48px;padding:10px 16px;font-size:15px}.chips:has(.sup){gap:10px}.microw{display:flex;align-items:center;justify-content:space-between;gap:8px}.microw .lbl2{margin:14px 2px 6px}.mic{min-height:44px;padding:8px 14px;border-radius:12px;border:1px solid var(--line);background:var(--card);font-size:14px;font-weight:600;margin-top:6px}.mic.rec{background:#c0392b;color:#fff;border-color:#c0392b;animation:micpulse 1.3s infinite}@keyframes micpulse{50%{opacity:.75}}.micstat:empty{display:none}.micstat{min-height:18px;font-size:13px;color:var(--muted);margin:4px 2px 0;overflow-wrap:anywhere}
 .infoi{border:0;background:none;font-size:17px;min-width:44px;min-height:44px;color:var(--muted);padding:0}.infotxt{font-size:13px;margin:0 0 8px}.infotxt[hidden]{display:none}.lblrow{display:flex;align-items:center;gap:0}.lblrow+.infotxt{margin-top:-4px}
@@ -598,11 +599,19 @@ function dayHtml() {
     </div>`;
 }
 
+// Morning check on the readiness score: stays until you answer, then shrinks to one line. It is only recorded next to the score and never changes the calculation.
+const RDCHK = { correct: 'Feels right', better: 'I feel better', worse: 'I feel worse' };
+function readinessCheckHtml(d, r, entry) {
+  if (r.pending) return '';
+  const c = entry.readinessCheck;
+  if (c && RDCHK[c.v]) return `<div class="rdchk done"><span class="muted">Readiness check: <b>${RDCHK[c.v]}</b>${c.note ? ` · ${esc(c.note)}` : ''}</span><button class="layout-log" data-act="rdchk-clear">Change</button></div>`;
+  return `<div class="rdchk"><div class="muted">Readiness ${r.score}/10. How does it feel?</div><div class="rdchk-btns">${Object.entries(RDCHK).map(([k, l]) => `<button class="ckbtn" data-rdchk="${k}">${l}</button>`).join('')}</div><input class="field" id="rdchkNote" maxlength="300" placeholder="Comment (optional)" autocomplete="off"></div>`;
+}
 function dayCheckinHtml(d, needReview) {
   const r = readiness(d), entry = S.reviews[d] || {}, h = S.health[d] || {}, locked = lockedNow();
   // One line that is always visible: readiness, steps, calories burned and water. Tap it for the detail and the counters.
-  const line = [r.pending ? 'Readiness pending' : `Readiness ${r.score}/10`, h.steps != null ? `${fmt(h.steps)} steps` : '', h.caloriesOut != null ? `${fmt(h.caloriesOut)} kcal` : '', `💧 ${entry.water || 0}`, drank(entry) ? `🍺 ${drinkTotal(entry)}` : ''].filter(Boolean).map(x => `<span style="white-space:nowrap">${esc(x)}</span>`).join(' · ');
-  return `<div class="card layout-checkin"><div class="layout-checkin-top"><div><b>Check-in</b>${needReview ? ' <span class="muted">Yesterday not logged</span>' : ''}</div>${needReview ? '<button class="layout-log" data-act="review-yesterday">Log it ›</button>' : ''}</div><details class="layout-checkin" id="dayCheckDetails" ${dayCheckOpen ? 'open' : ''}><summary><span class="muted ckline">${line}</span><span class="layout-chevron">⌄</span><span class="ckbtns"><button class="ckbtn layout-water" data-cnt data-date="${d}" data-key="water" data-by="1" aria-label="Add a glass of water">+ 💧 Water</button>${drank(entry) && !locked ? `<button class="ckbtn layout-beer" data-cnt data-date="${d}" data-key="beer" data-by="1" aria-label="Add a beer">+ 🍺 Beer</button>` : ''}</span></summary><div class="layout-checkin-content">${readinessCard(d)}${healthLine(d, false)}<div class="track" style="margin-top:8px">${trackHtml(d, false, locked)}</div></div></details></div>`;
+  const line = [r.pending ? 'Readiness pending' : `Readiness ${r.score}/10`, h.steps != null ? `${fmt(h.steps)} steps` : '', typeof h.hrv === 'number' ? `HRV ${Math.round(h.hrv)} ms` : '', h.caloriesOut != null ? `${fmt(h.caloriesOut)} kcal` : '', `💧 ${entry.water || 0}`, drank(entry) ? `🍺 ${drinkTotal(entry)}` : ''].filter(Boolean).map(x => `<span style="white-space:nowrap">${esc(x)}</span>`).join(' · ');
+  return `<div class="card layout-checkin"><div class="layout-checkin-top"><div><b>Check-in</b>${needReview ? ' <span class="muted">Yesterday not logged</span>' : ''}</div>${needReview ? '<button class="layout-log" data-act="review-yesterday">Log it ›</button>' : ''}</div>${readinessCheckHtml(d, r, entry)}<details class="layout-checkin" id="dayCheckDetails" ${dayCheckOpen ? 'open' : ''}><summary><span class="muted ckline">${line}</span><span class="layout-chevron">⌄</span><span class="ckbtns"><button class="ckbtn layout-water" data-cnt data-date="${d}" data-key="water" data-by="1" aria-label="Add a glass of water">+ 💧 Water</button>${drank(entry) && !locked ? `<button class="ckbtn layout-beer" data-cnt data-date="${d}" data-key="beer" data-by="1" aria-label="Add a beer">+ 🍺 Beer</button>` : ''}</span></summary><div class="layout-checkin-content">${readinessCard(d)}${healthLine(d, false)}<div class="track" style="margin-top:8px">${trackHtml(d, false, locked)}</div></div></details></div>`;
 }
 /** The next meetings of today, so the day's shape is clear before the to-dos. */
 function nextUpHtml(d, timed) {
@@ -863,7 +872,7 @@ let saveTimer;
 function patchDay(date, patch) {
   const r = S.reviews[date] || (S.reviews[date] = {});
   Object.assign(r, patch, { updatedAt: Date.now() });
-  const empty = !r.mood && !r.energy && !r.alcohol && !r.sex && !r.travel && !r.ill && !suppsTaken(r).length && !r.water && !drinkTotal(r) && !(r.tags || []).length && !(r.did || '').trim() && !(r.win || '').trim();
+  const empty = !r.mood && !r.energy && !r.alcohol && !r.sex && !r.travel && !r.ill && !suppsTaken(r).length && !r.water && !drinkTotal(r) && !(r.tags || []).length && !(r.did || '').trim() && !(r.win || '').trim() && !r.readinessCheck;
   if (empty) delete S.reviews[date];
   save();
 }
@@ -1355,6 +1364,7 @@ function bind(root) {
   root.querySelectorAll('[data-week-set]').forEach(b => b.onclick = () => { S.settings.weekDays = +b.dataset.weekSet; save(); render(); });
   root.querySelectorAll('[data-theme-set]').forEach(b => b.onclick = () => { S.settings.theme = b.dataset.themeSet; save(); applyTheme(); render(); });
   root.querySelectorAll('[data-act]').forEach(b => b.onclick = () => act(b.dataset.act));
+  root.querySelectorAll('[data-rdchk]').forEach(b => b.onclick = () => { const v = b.dataset.rdchk, n = ($('rdchkNote') ? $('rdchkNote').value : '').trim().slice(0, 300); if (!RDCHK[v]) return; patchDay(today(), { readinessCheck: { v, note: n, score: readiness(today()).score, at: Date.now() } }); render(); });
   if (view === 'review' && !viewLocked(view)) bindReview(root);
   if (view === 'settings') { const f = $('importFile'); if (f) f.onchange = importData; bindLock(); const dl = $('dictLang'); if (dl) dl.onchange = () => { S.settings.dictLang = dl.value; save(); }; }
   const checkDetails = root.querySelector('#dayCheckDetails');
@@ -1405,6 +1415,7 @@ async function act(a) {
   else if (a === 'review-yesterday') { reviewDate = addDays(today(), -1); go('review'); }
   else if (a === 'add-task') openAddTask();
   else if (a === 'fab') openFabMenu();
+  else if (a === 'rdchk-clear') { patchDay(today(), { readinessCheck: null }); render(); }
   else if (a === 'readiness') openReadiness();
   else if (a === 'new-note-now') startMeetingNote({ title: 'Meeting', start: new Date().toISOString() });
   else if (a === 'new-tag') {
