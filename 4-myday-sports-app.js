@@ -599,19 +599,50 @@ function dayHtml() {
     </div>`;
 }
 
-// Morning check on the readiness score: stays until you answer, then shrinks to one line. It is only recorded next to the score and never changes the calculation.
+// Check-in on the readiness score (today's morning assessment from last night's sleep). All the data is open until you answer; then it is one line with Show data.
+// Your answer is saved next to the score and never changes the calculation.
 const RDCHK = { correct: 'Feels right', better: 'I feel better', worse: 'I feel worse' };
+let rdOpen = false, rdDraft = null; // rdDraft keeps an unsaved comment while the screen redraws
+(function () {
+  const st = document.createElement('style');
+  st.textContent = `.cardhead{font-size:14px}.cardhead .ckh{font-size:14px;font-weight:600}.cardhead .muted{font-size:14px}
+  .ycard{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px}
+  .ckrow{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:10px 12px 0}.ckrow .ckhint{font-size:12px;margin-top:2px}
+  .ckrow.one{align-items:center;padding-bottom:10px}
+  .ctitle{padding:10px 12px 0}
+  .rdbox{padding:8px 12px 12px}.rd.big{padding:14px 16px;gap:16px;cursor:default}.rd.big .n{font-size:56px;min-width:84px}.rd.big .n small{font-size:20px}.rd.big .t b{font-size:21px;margin-bottom:3px}.rd.big .t span{font-size:14px}
+  .rdpart{margin-top:12px}.rdbox .ask{font-size:14px;margin:12px 0 8px}.rdbox .rdchk-btns{display:flex;gap:8px}.rdbox .rdchk-btns .ckbtn{font-size:13px;min-height:46px;padding:6px 4px}.rdbox .field{margin-top:0}.rdbox .ckbtn.sel{background:var(--acc);color:var(--onacc)}`;
+  document.head.appendChild(st);
+})();
+const rdDate = x => parseYmd(x).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+function readinessDataHtml(r, d) {
+  const tot = r.parts.reduce((a, q) => a + q.w, 0);
+  return `${r.ill ? `<div class="errbox">You marked today as ill or injured, so the score is held at 5. Untick it on the day screen if that changes.</div>` : ''}
+    ${r.flags.length ? `<div class="errbox">${r.capped ? 'The score is held at 5 because ' : 'Worth watching: '}${esc(r.flags.join(', '))}. These can come before an illness. Treat today as a lighter day.</div>` : ''}
+    ${r.parts.map(p => `<div class="rdpart"><div style="display:flex;justify-content:space-between;gap:8px"><b style="font-weight:600">${esc(p.name)}</b><span class="muted num" style="font-size:12px">${Math.round(p.pts)} of 100 · ${Math.round(p.w / tot * 100)}%</span></div><div class="bar2"><i style="width:${Math.round(p.pts)}%"></i></div><div class="muted" style="font-size:13px;margin-top:3px">${esc(p.text)}. ${esc(p.hint)}</div></div>`).join('')}
+    ${r.missing.length ? `<p class="muted" style="font-size:13px;margin-top:14px">Not included yet: ${esc(r.missing.join(', '))}${r.learning < 7 ? `. Your baseline needs at least 7 days of data (you have ${r.learning}).` : '. No figure for it today.'}</p>` : ''}
+    ${sleepChartHtml(d)}`;
+}
 function readinessCheckHtml(d, r, entry) {
   if (r.pending) return '';
-  const c = entry.readinessCheck;
-  if (c && RDCHK[c.v]) return `<div class="rdchk done"><span class="muted">Readiness check: <b>${RDCHK[c.v]}</b>${c.note ? ` · ${esc(c.note)}` : ''}</span><button class="layout-log" data-act="rdchk-clear">Change</button></div>`;
-  return `<div class="rdchk"><div class="muted">Readiness ${r.score}/10. How does it feel?</div><div class="rdchk-btns">${Object.entries(RDCHK).map(([k, l]) => `<button class="ckbtn" data-rdchk="${k}">${l}</button>`).join('')}</div><input class="field" id="rdchkNote" maxlength="300" placeholder="Comment (optional)" autocomplete="off"></div>`;
+  const c = entry.readinessCheck, done = !!(c && RDCHK[c.v]);
+  if (done && !rdOpen) return `<div class="ckrow one cardhead"><div><b class="ckh">Check-in</b> <span class="muted">· ${r.score}/10</span></div><button class="layout-log" data-act="rdchk-toggle">Show data</button></div>`;
+  const note = rdDraft != null ? rdDraft : (done ? (c.note || '') : '');
+  const card = readinessCard(d).replace('<button class="rd" data-act="readiness">', '<div class="rd big">').replace(/<\/button>$/, '</div>');
+  return `<div class="ckrow cardhead"><div><b class="ckh">Check-in</b> <span class="muted">· Readiness today</span><div class="muted ckhint">${esc(rdDate(d))} · from last night's sleep and recent load</div></div>${done ? '<button class="layout-log" data-act="rdchk-toggle">Hide data</button>' : ''}</div>
+    <div class="rdbox">${card}${readinessDataHtml(r, d)}
+    <div class="muted ask">Comment (optional), then tap a feeling to ${done ? 'change your answer' : 'save today\u2019s check-in'}</div>
+    <input class="field" id="rdchkNote" maxlength="300" placeholder="Comment (optional)" value="${esc(note)}" autocomplete="off">
+    <div class="rdchk-btns" style="margin-top:8px">${Object.entries(RDCHK).map(([k, l]) => `<button class="ckbtn${done && c.v === k ? ' sel' : ''}" data-rdchk="${k}">${l}</button>`).join('')}</div></div>`;
 }
 function dayCheckinHtml(d, needReview) {
   const r = readiness(d), entry = S.reviews[d] || {}, h = S.health[d] || {}, locked = lockedNow();
-  // One line that is always visible: readiness, steps, calories burned and water. Tap it for the detail and the counters.
-  const line = [r.pending ? 'Readiness pending' : `Readiness ${r.score}/10`, h.steps != null ? `${fmt(h.steps)} steps` : '', typeof h.hrv === 'number' ? `HRV ${Math.round(h.hrv)} ms` : '', h.caloriesOut != null ? `${fmt(h.caloriesOut)} kcal` : '', `💧 ${entry.water || 0}`, drank(entry) ? `🍺 ${drinkTotal(entry)}` : ''].filter(Boolean).map(x => `<span style="white-space:nowrap">${esc(x)}</span>`).join(' · ');
-  return `<div class="card layout-checkin"><div class="layout-checkin-top"><div><b>Check-in</b>${needReview ? ' <span class="muted">Yesterday not logged</span>' : ''}</div>${needReview ? '<button class="layout-log" data-act="review-yesterday">Log it ›</button>' : ''}</div>${readinessCheckHtml(d, r, entry)}<details class="layout-checkin" id="dayCheckDetails" ${dayCheckOpen ? 'open' : ''}><summary><span class="muted ckline">${line}</span><span class="layout-chevron">⌄</span><span class="ckbtns"><button class="ckbtn layout-water" data-cnt data-date="${d}" data-key="water" data-by="1" aria-label="Add a glass of water">+ 💧 Water</button>${drank(entry) && !locked ? `<button class="ckbtn layout-beer" data-cnt data-date="${d}" data-key="beer" data-by="1" aria-label="Add a beer">+ 🍺 Beer</button>` : ''}</span></summary><div class="layout-checkin-content">${readinessCard(d)}${healthLine(d, false)}<div class="track" style="margin-top:8px">${trackHtml(d, false, locked)}</div></div></details></div>`;
+  // One line that is always visible: steps, HRV, calories burned and water. Tap the chevron for the detail and the counters.
+  const line = [r.pending ? 'Readiness pending' : '', h.steps != null ? `${fmt(h.steps)} steps` : '', typeof h.hrv === 'number' ? `HRV ${Math.round(h.hrv)} ms` : '', h.caloriesOut != null ? `${fmt(h.caloriesOut)} kcal` : '', `💧 ${entry.water || 0}`, drank(entry) ? `🍺 ${drinkTotal(entry)}` : ''].filter(Boolean).map(x => `<span style="white-space:nowrap">${esc(x)}</span>`).join(' · ');
+  const review = needReview ? `<div class="card ycard cardhead"><span><b class="ckh">Review</b> <span class="muted">· ${esc(rdDate(addDays(d, -1)))} · not logged</span></span><button class="layout-log" data-act="review-yesterday">Log it ›</button></div>` : '';
+  const check = r.pending ? '' : `<div class="card layout-checkin">${readinessCheckHtml(d, r, entry)}</div>`;
+  const today = `<div class="card layout-checkin"><div class="ctitle cardhead"><b class="ckh">Today so far</b> <span class="muted">· ${esc(rdDate(d))}</span></div><details class="layout-checkin" id="dayCheckDetails" ${dayCheckOpen ? 'open' : ''}><summary><span class="muted ckline">${line}</span><span class="layout-chevron">⌄</span><span class="ckbtns"><button class="ckbtn layout-water" data-cnt data-date="${d}" data-key="water" data-by="1" aria-label="Add a glass of water">+ 💧 Water</button>${drank(entry) && !locked ? `<button class="ckbtn layout-beer" data-cnt data-date="${d}" data-key="beer" data-by="1" aria-label="Add a beer">+ 🍺 Beer</button>` : ''}</span></summary><div class="layout-checkin-content">${r.pending ? readinessCard(d) : ''}${healthLine(d, false)}<div class="track" style="margin-top:8px">${trackHtml(d, false, locked)}</div></div></details></div>`;
+  return review + check + today;
 }
 /** The next meetings of today, so the day's shape is clear before the to-dos. */
 function nextUpHtml(d, timed) {
@@ -1364,7 +1395,8 @@ function bind(root) {
   root.querySelectorAll('[data-week-set]').forEach(b => b.onclick = () => { S.settings.weekDays = +b.dataset.weekSet; save(); render(); });
   root.querySelectorAll('[data-theme-set]').forEach(b => b.onclick = () => { S.settings.theme = b.dataset.themeSet; save(); applyTheme(); render(); });
   root.querySelectorAll('[data-act]').forEach(b => b.onclick = () => act(b.dataset.act));
-  root.querySelectorAll('[data-rdchk]').forEach(b => b.onclick = () => { const v = b.dataset.rdchk, n = ($('rdchkNote') ? $('rdchkNote').value : '').trim().slice(0, 300); if (!RDCHK[v]) return; patchDay(today(), { readinessCheck: { v, note: n, score: readiness(today()).score, at: Date.now() } }); render(); });
+  root.querySelectorAll('[data-rdchk]').forEach(b => b.onclick = () => { const v = b.dataset.rdchk, n = ($('rdchkNote') ? $('rdchkNote').value : '').trim().slice(0, 300); if (!RDCHK[v]) return; rdDraft = null; rdOpen = false; patchDay(today(), { readinessCheck: { v, note: n, score: readiness(today()).score, at: Date.now() } }); render(); });
+  const rdNote = $('rdchkNote'); if (rdNote) rdNote.oninput = () => { rdDraft = rdNote.value; };
   if (view === 'review' && !viewLocked(view)) bindReview(root);
   if (view === 'settings') { const f = $('importFile'); if (f) f.onchange = importData; bindLock(); const dl = $('dictLang'); if (dl) dl.onchange = () => { S.settings.dictLang = dl.value; save(); }; }
   const checkDetails = root.querySelector('#dayCheckDetails');
@@ -1415,7 +1447,7 @@ async function act(a) {
   else if (a === 'review-yesterday') { reviewDate = addDays(today(), -1); go('review'); }
   else if (a === 'add-task') openAddTask();
   else if (a === 'fab') openFabMenu();
-  else if (a === 'rdchk-clear') { patchDay(today(), { readinessCheck: null }); render(); }
+  else if (a === 'rdchk-toggle') { rdOpen = !rdOpen; rdDraft = null; render(); }
   else if (a === 'readiness') openReadiness();
   else if (a === 'new-note-now') startMeetingNote({ title: 'Meeting', start: new Date().toISOString() });
   else if (a === 'new-tag') {
@@ -1928,6 +1960,6 @@ document.addEventListener('visibilitychange', () => {
   if (view === 'inbox' && (!S.inbox || Date.now() - S.inbox.at > 5 * 60 * 1000)) loadInbox();
 });
 setInterval(() => { if (view === 'portfolio' && !document.hidden && !$('overlay').innerHTML) loadPrices(); }, 5 * 60 * 1000); // keeps prices fresh while the page is open
-setInterval(() => { if (rollDay() && connected() && !$('overlay').innerHTML) loadDay(viewDate); if (view === 'today' && viewDate === today() && !$('overlay').innerHTML && !document.hidden) render(); }, 60 * 1000); // keeps the now-line and "next" label current
+setInterval(() => { if (rollDay() && connected() && !$('overlay').innerHTML) loadDay(viewDate); if (view === 'today' && viewDate === today() && !$('overlay').innerHTML && !document.hidden && !(document.activeElement && document.activeElement.id === 'rdchkNote')) render(); }, 60 * 1000); // keeps the now-line and "next" label current
 
 // Republish verified Sports layout after a stalled hosting build.
