@@ -1,6 +1,6 @@
 
 'use strict';
-const BUILD = '2026-11-22.calendars';
+const BUILD = '2026-11-22.calendars.alarm';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -676,7 +676,7 @@ function dayHtml() {
   return `<div class="hd"><div><h1>${parseYmd(d).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}</h1><div class="mu">${esc(sub)}</div></div>${pill(isToday ? '' : '<button class="pill" data-act="today">Today</button>')}</div>
     ${weekHtml(d)}${miniMonthHtml(d)}${weatherHtml()}
     <div class="stack">
-    ${isToday ? dayCheckinHtml(d, needReview) : d <= today() ? trackCard(d) : ''}${isToday ? portfolioLine() : ''}
+    ${isToday ? dayCheckinHtml(d, needReview) : d <= today() ? trackCard(d) : ''}${isToday ? portfolioLine() : ''}${isToday ? wakeCardHtml() : ''}
     ${allDay.length ? `<div class="allday">${allDay.map(e => `<span>${esc(e.title)}</span>`).join('')}</div>` : ''}
     ${nextUpHtml(d, timed)}
     ${trayHtml(d, b)}
@@ -730,6 +730,35 @@ function dayCheckinHtml(d, needReview) {
   const check = r.pending ? '' : `<div class="card layout-checkin">${readinessCheckHtml(d, r, entry)}</div>`;
   const today = `<div class="card layout-checkin"><div class="ctitle cardhead"><b class="ckh">Today so far</b> <span class="muted">· ${esc(rdDate(d))}</span></div><details class="layout-checkin" id="dayCheckDetails" ${dayCheckOpen ? 'open' : ''}><summary><span class="muted ckline">${line}</span><span class="layout-chevron">⌄</span><span class="ckbtns"><button class="ckbtn layout-water" data-cnt data-date="${d}" data-key="water" data-by="1" aria-label="Add a glass of water">+ 💧 Water</button>${drank(entry) && !locked ? `<button class="ckbtn layout-beer" data-cnt data-date="${d}" data-key="beer" data-by="1" aria-label="Add a beer">+ 🍺 Beer</button>` : ''}</span></summary><div class="layout-checkin-content">${r.pending ? readinessCard(d) : ''}${healthLine(d, false)}<div class="track" style="margin-top:8px">${trackHtml(d, false, locked)}</div></div></details></div>`;
   return review + check + today;
+}
+/* ----- wake-up alarm: one tap sends the time to the automation app on your phone, which sets it in Sleep ----- */
+const ALARM_DEFAULT_TIMES = ['06:30', '07:00', '07:30'];
+const alarmTimes = () => (Array.isArray(S.settings.alarmTimes) && S.settings.alarmTimes.length === 3 ? S.settings.alarmTimes : ALARM_DEFAULT_TIMES);
+const alarmHook = () => (S.settings.alarmWebhook || '').trim();
+function wakeCardHtml() {
+  const last = S.settings.alarmLast;
+  return `<div class="card layout-checkin"><div class="ctitle cardhead"><b class="ckh">Wake up</b> <span class="muted">\u00b7 sets it in your sleep app</span></div>
+    <div class="rdbox"><div class="chips" style="margin:0">${alarmTimes().map(t => `<button class="chip" data-wake="${esc(t)}">${esc(t)}</button>`).join('')}<button class="chip" data-act="wake-pick">Pick a time\u2026</button></div>
+    ${alarmHook() ? '' : '<p class="muted" style="font-size:12px;margin:8px 0 0">One-time setup: paste your alarm webhook under More \u203a Settings \u203a Alarm.</p>'}
+    ${last ? `<p class="muted" style="font-size:12px;margin:6px 0 0">Last request ${esc(last.time)} \u00b7 received ${esc(new Date(last.at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }))}. Check Sleep to confirm it is set.</p>` : ''}</div></div>`;
+}
+async function sendWake(time) {
+  const base = alarmHook();
+  if (!/^https:\/\/trigger\.macrodroid\.com\/\S/.test(base)) { toast('Add your alarm webhook first (More \u203a Settings \u203a Alarm).'); return; }
+  const h = parseInt(time.slice(0, 2), 10), m = parseInt(time.slice(3, 5), 10);
+  const url = `${base}${base.includes('?') ? '&' : '?'}hour=${h}&minutes=${m}`;
+  let res = null;
+  try { res = await fetch(url, { cache: 'no-store' }); } catch (e) { toast('Could not send. Check your internet connection.'); return; }
+  if (!res.ok) { toast(res.status === 404 ? 'The webhook link was not recognised. Check it under More \u203a Settings \u203a Alarm.' : `The automation service answered with an error (${res.status}). Try again later.`); return; }
+  S.settings.alarmLast = { time, at: Date.now() }; save(); render();
+  toast(`Request for ${time} received by the automation service. Check Sleep to confirm the alarm is set.`);
+}
+function openWakePicker() {
+  openSheet(`<h2>Wake up at</h2><p class="muted" style="margin:2px 0 8px">The time goes to the automation app on your phone, which sets the alarm in Sleep.</p>
+    <input class="field" type="time" id="wakeTime" value="${esc(alarmTimes()[0])}">
+    <div class="row" style="margin-top:14px"><button class="btn day" id="wakeGo">Set alarm</button><button class="btn" id="wakeNo">Cancel</button></div>`);
+  $('wakeNo').onclick = closeSheet;
+  $('wakeGo').onclick = () => { const v = $('wakeTime').value; if (!/^\d{2}:\d{2}$/.test(v)) return; closeSheet(); sendWake(v); };
 }
 /** The next meetings of today, so the day's shape is clear before the to-dos. */
 function nextUpHtml(d, timed) {
@@ -1212,6 +1241,13 @@ function settingsHtml() {
       <p class="muted" style="margin-top:0">Choose which Google calendars My Day shows. Hidden calendars stay untouched in Google Calendar; this only changes this phone. New calendars appear here after a refresh.</p>
       <div class="chips">${calNames().length ? calNames().map(n => `<button class="chip ${calHidden(n) ? '' : 'on'}" data-cal="${esc(n)}">${esc(n)}${calHidden(n) ? ' ✕' : ''}</button>`).join('') : '<span class="muted">No calendars loaded yet. Use Refresh everything in Connection first.</span>'}</div>
       <p class="muted" style="font-size:12px;margin:8px 0 0">Tap a calendar to show or hide it.</p></div></details>
+    ${secOpenTag('alarm', 'Alarm')}
+      <p class="muted">One-tap wake-up times on the Day tab. ${infoHtml('alarm', 'MyDay sends the time as a web request to the automation app on your phone (for example MacroDroid), and that app sets the alarm in Sleep. Paste the app\u2019s webhook link below. MyDay cannot see whether the alarm fired, so check Sleep the first time.')}</p>
+      <label class="lbl2" for="alarmHook">Alarm webhook link</label>
+      <input class="field" style="margin-top:0" id="alarmHook" inputmode="url" autocapitalize="off" value="${esc(S.settings.alarmWebhook || '')}" placeholder="https://trigger.macrodroid.com/\u2026/myday-alarm">
+      <span class="lbl2">Quick times on the Day tab</span>
+      <div class="row" style="margin-top:0;flex-wrap:wrap">${[0, 1, 2].map(i => `<input class="field" style="width:96px;margin-top:0" type="time" id="alarmT${i}" value="${esc(alarmTimes()[i])}">`).join('')}</div>
+      <div class="row" style="margin-top:12px"><button class="btn day" data-act="alarm-save">Save</button></div></div></details>
     ${secOpenTag('tags', 'Your tags')}
       <p class="muted">Quick tags in the Review. ${infoHtml('tags', 'Add your own from the Review tab; tap one of yours here to remove it.')}</p>
       <div class="chips">${[...SPORT_TAGS, ...BASE_TAGS].map(t => `<span class="chip">${esc(t)}</span>`).join('')}${S.tags.map(t => `<button class="chip on" data-tagdel="${esc(t)}">${esc(t)} ✕</button>`).join('')}</div></div></details>
@@ -1489,6 +1525,7 @@ function bind(root) {
   root.querySelectorAll('[data-week-set]').forEach(b => b.onclick = () => { S.settings.weekDays = +b.dataset.weekSet; save(); render(); });
   root.querySelectorAll('[data-theme-set]').forEach(b => b.onclick = () => { S.settings.theme = b.dataset.themeSet; save(); applyTheme(); render(); });
   root.querySelectorAll('[data-act]').forEach(b => b.onclick = () => act(b.dataset.act));
+  root.querySelectorAll('[data-wake]').forEach(b => b.onclick = () => sendWake(b.dataset.wake));
   root.querySelectorAll('[data-rdchk]').forEach(b => b.onclick = () => { const v = b.dataset.rdchk, n = ($('rdchkNote') ? $('rdchkNote').value : '').trim().slice(0, 300); if (!RDCHK[v]) return; rdDraft = null; rdOpen = false; patchDay(today(), { readinessCheck: { v, note: n, score: readiness(today()).score, at: Date.now() } }); render(); });
   const rdNote = $('rdchkNote'); if (rdNote) rdNote.oninput = () => { rdDraft = rdNote.value; };
   if (view === 'review' && !viewLocked(view)) bindReview(root);
@@ -1559,6 +1596,8 @@ async function act(a) {
     if (add.length) { patchReview({ did: (cur ? cur.trimEnd() + '\n' : '') + add.join('\n') }); render(); }
   }
   else if (a === 'clear-review') { if (confirm('Clear this day\'s review?')) { delete S.reviews[reviewDate]; save(); render(); } }
+  else if (a === 'wake-pick') openWakePicker();
+  else if (a === 'alarm-save') { saveAlarmSettings(); toast('Saved'); }
   else if (a === 'save-conn') { saveConn(); toast('Saved'); }
   else if (a === 'connect') {
     saveConn(); const base = baseUrl();
@@ -1602,6 +1641,11 @@ async function act(a) {
   else if (a === 'demo-on') { loadDemo(); render(); toast('Demo data loaded'); }
   else if (a === 'demo-off') { removeDemo(); render(); toast('Demo data removed'); }
   else if (a === 'force') forceRefresh();
+}
+function saveAlarmSettings() {
+  S.settings.alarmWebhook = ($('alarmHook') ? $('alarmHook').value : S.settings.alarmWebhook || '').trim();
+  S.settings.alarmTimes = [0, 1, 2].map(i => { const el = $('alarmT' + i), v = el ? el.value.trim() : ''; return /^\d{2}:\d{2}$/.test(v) ? v : ALARM_DEFAULT_TIMES[i]; });
+  save();
 }
 function saveConn() {
   S.settings.appKey = ($('appKey') ? $('appKey').value : S.settings.appKey).trim();
@@ -1804,10 +1848,10 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 /** A small ⓘ that shows or hides an explanation, so long notes do not take space until you want them. */
 const infoHtml = (id, text) => `<button type="button" class="infoi" data-info="${id}" aria-expanded="false" aria-label="More information">ⓘ</button><p class="infotxt muted" id="info-${id}" hidden>${text}</p>`;
 const secIsOpen = id => !!(S.settings.secOpen || {})[id];
-const SECTIONS = [['connection', 'Connection'], ['display', 'Display'], ['calendars', 'Calendars'], ['tags', 'Tags'], ['supps', 'Supplements'], ['dictation', 'Dictation'], ['lock', 'App lock'], ['backup', 'Backup'], ['data', 'Your data'], ['about', 'About']];
+const SECTIONS = [['connection', 'Connection'], ['display', 'Display'], ['calendars', 'Calendars'], ['alarm', 'Alarm'], ['tags', 'Tags'], ['supps', 'Supplements'], ['dictation', 'Dictation'], ['lock', 'App lock'], ['backup', 'Backup'], ['data', 'Your data'], ['about', 'About']];
 function secSummary(id) {
   const ago = () => { const l = SharedBackup.lastOk(); return l ? SharedBackup.ago(new Date(l).toISOString()) : 'not yet'; };
-  return { connection: connected() ? 'Connected' : 'Not connected', display: S.settings.theme === 'light' ? 'Light' : S.settings.theme === 'auto' ? 'Match phone' : 'Dark', calendars: (() => { const n = calNames(); return n.length ? `${n.length - (S.settings.hiddenCals || []).filter(x => n.includes(x)).length} of ${n.length} shown` : ''; })(), tags: String(S.tags.length + SPORT_TAGS.length + BASE_TAGS.length), supps: String(suppList().length), dictation: (DICT_LANGS.find(x => x[0] === (S.settings.dictLang || '')) || DICT_LANGS[0])[1], lock: lockEnabled() ? 'On' : 'Off', backup: SharedBackup.configured() ? ago() : 'Not set up', data: '', about: BUILD }[id] || '';
+  return { connection: connected() ? 'Connected' : 'Not connected', display: S.settings.theme === 'light' ? 'Light' : S.settings.theme === 'auto' ? 'Match phone' : 'Dark', alarm: alarmHook() ? 'Set up' : 'Not set up', calendars: (() => { const n = calNames(); return n.length ? `${n.length - (S.settings.hiddenCals || []).filter(x => n.includes(x)).length} of ${n.length} shown` : ''; })(), tags: String(S.tags.length + SPORT_TAGS.length + BASE_TAGS.length), supps: String(suppList().length), dictation: (DICT_LANGS.find(x => x[0] === (S.settings.dictLang || '')) || DICT_LANGS[0])[1], lock: lockEnabled() ? 'On' : 'Off', backup: SharedBackup.configured() ? ago() : 'Not set up', data: '', about: BUILD }[id] || '';
 }
 const secOpenTag = (id, title) => `<details class="card setsec" id="sec-${id}" ${secIsOpen('sec-' + id) ? 'open' : ''}><summary><b>${title}</b><span class="muted">${esc(secSummary(id))}</span><i class="layout-chevron">⌄</i></summary><div class="secbody">`;
 
@@ -2060,3 +2104,4 @@ setInterval(() => { if (view === 'portfolio' && !document.hidden && !$('overlay'
 setInterval(() => { if (!document.hidden) refreshMadridWeather(); if (rollDay() && connected() && !$('overlay').innerHTML) loadDay(viewDate); if (view === 'today' && viewDate === today() && !$('overlay').innerHTML && !document.hidden && !(document.activeElement && document.activeElement.id === 'rdchkNote')) render(); }, 60 * 1000); // keeps the now-line and "next" label current
 
 // Republish verified Sports layout after a stalled hosting build.
+
