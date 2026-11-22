@@ -491,6 +491,61 @@ function weekHtml(date) {
   const days = Array.from({ length: n }, (_, i) => addDays(mon, i));
   return `<div class="wk"><button class="ar" data-act="wprev" aria-label="Previous week">‹</button>${days.map(d => `<button class="wd ${d === date ? 'on' : ''} ${d === t ? 'today' : ''}" data-day="${d}">${parseYmd(d).toLocaleDateString([], { weekday: 'narrow' })}<b>${parseYmd(d).getDate()}</b></button>`).join('')}<button class="ar" data-act="wnext" aria-label="Next week">›</button></div>`;
 }
+
+/* ----- mini month under the week strip ----- */
+const mmCache = {}, mmPending = {}; let mmSel = null; // mmSel = { m: 'YYYY-MM', forDate } while you page months
+(function () {
+  const st = document.createElement('style');
+  st.textContent = `.mm{border-bottom:1px solid var(--line);padding:0 0 6px;margin:-4px 0 10px}
+  .mm .mh{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted);padding:0 2px}
+  .mm .mh span{display:flex;align-items:center;gap:2px}
+  .mm .mh button{border:0;background:none;color:var(--muted);font-size:16px;min-width:36px;min-height:32px;padding:0}
+  .mm .mg{display:grid;grid-template-columns:repeat(7,1fr);text-align:center}
+  .mm .mg i{font-style:normal;font-size:11px;color:var(--muted);padding:2px 0}
+  .mm .md{position:relative;border:0;background:none;color:var(--ink);font-size:13px;height:34px;padding:0;display:flex;align-items:center;justify-content:center}
+  .mm .md b{font-weight:400;min-width:26px;height:26px;line-height:26px;border-radius:13px}
+  .mm .md.out{color:var(--muted);opacity:.45}
+  .mm .md.today b{border:1px solid var(--muted)}
+  .mm .md.on b{background:var(--acc);color:var(--onacc);font-weight:600;border-color:var(--acc)}
+  .mm .md u{position:absolute;bottom:1px;left:50%;margin-left:-2px;width:4px;height:4px;border-radius:50%;background:var(--muted)}
+  .legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted);margin:0 2px 6px}
+  .legend span{display:inline-flex;align-items:center;gap:5px}.legend i{width:8px;height:8px;border-radius:50%;display:inline-block}`;
+  document.head.appendChild(st);
+})();
+function isoWeek(s) { const d = parseYmd(s); d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7)); const w1 = new Date(d.getFullYear(), 0, 4); return 1 + Math.round(((d - w1) / 864e5 - 3 + ((w1.getDay() + 6) % 7)) / 7); }
+function mmGrid(ym) { const first = ym + '-01', start = weekStart(first), last = ymd(new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0)), end = addDays(weekStart(last), 6); const days = []; for (let d = start; d <= end; d = addDays(d, 1)) days.push(d); return days; }
+function mmDots(ym) {
+  const dots = {}, add = e => { if (!e.allDay) dots[ymd(new Date(e.start))] = 1; };
+  for (const c of Object.values(S.cache)) (c.events || []).forEach(add);
+  const m = mmCache[ym]; if (m) m.events.forEach(add);
+  return dots;
+}
+async function loadMonth(ym) {
+  const days = mmGrid(ym), from = parseYmd(days[0]).toISOString(), to = parseYmd(addDays(days[days.length - 1], 1)).toISOString();
+  try { const r = await api(`/api/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`); mmCache[ym] = { at: Date.now(), events: r.events || [] }; }
+  catch { mmCache[ym] = { at: Date.now() - 5 * 6e4, events: [] }; mmPending[ym] = 0; return; } // try again in 5 minutes, without redrawing
+  mmPending[ym] = 0; if (view === 'today') render();
+}
+function miniMonthHtml(date) {
+  const ym = mmSel && mmSel.forDate === date ? mmSel.m : date.slice(0, 7), days = mmGrid(ym), t = today();
+  const m = mmCache[ym];
+  if (connected() && !mmPending[ym] && (!m || Date.now() - m.at > 10 * 6e4)) { mmPending[ym] = 1; setTimeout(() => loadMonth(ym), 0); }
+  const dots = mmDots(ym);
+  const title = parseYmd(ym + '-01').toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  return `<div class="mm"><div class="mh"><span><button data-act="mprev" aria-label="Previous month">‹</button>${title}<button data-act="mnext" aria-label="Next month">›</button></span><span>week ${isoWeek(date)}</span></div>
+    <div class="mg">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<i>${x}</i>`).join('')}${days.map(d => `<button class="md ${d.slice(0, 7) !== ym ? 'out' : ''} ${d === date ? 'on' : ''} ${d === t ? 'today' : ''}" data-day="${d}" aria-label="${esc(parseYmd(d).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' }))}"><b>${parseYmd(d).getDate()}</b>${dots[d] ? '<u></u>' : ''}</button>`).join('')}</div></div>`;
+}
+/* ----- calendar colours ----- */
+const CAL_PALETTE = ['#60a5fa', '#fb923c', '#4ade80', '#c084fc', '#f472b6', '#facc15', '#2dd4bf', '#f87171'];
+function calColor(name) {
+  const m = S.settings.calColors || (S.settings.calColors = {});
+  if (!(name in m)) { m[name] = Object.keys(m).length % CAL_PALETTE.length; setTimeout(save, 0); }
+  return CAL_PALETTE[m[name]];
+}
+function calLegendHtml(c) {
+  const names = (c && c.calendars || []).filter(Boolean); if (names.length < 2) return '';
+  return `<div class="legend">${names.map(n => `<span><i style="background:${calColor(n)}"></i>${esc(n)}</span>`).join('')}</div>`;
+}
 function healthLine(d, withTiles = true) {
   const h = S.health[d] || {};
   const p = [h.sleepMinutes != null && `Slept ${dur(h.sleepMinutes)}`, h.restingHr != null && `resting ${Math.round(h.restingHr)} bpm`].filter(Boolean);
@@ -549,7 +604,8 @@ function layoutLanes(items) {
   clusters.forEach(c => c.items.forEach(it => { it.n = c.lanes.length; }));
   return sorted;
 }
-function timelineHtml(date, timed, tasks) {
+function timelineHtml(date, timed, tasks, cal) {
+  const multi = cal && (cal.calendars || []).length > 1;
   const isToday = date === today(), now = Date.now(), nowM = (now - parseYmd(date).getTime()) / 6e4;
   const items = [
     ...timed.map(ev => { const s = Math.max(0, minutesIn(date, ev.start)); return { ev, s, e: Math.max(s + 15, Math.min(1440, minutesIn(date, ev.end))) }; }),
@@ -567,7 +623,7 @@ function timelineHtml(date, timed, tasks) {
     if (it.ev) {
       const e = it.ev, h = Math.max(24, y(it.e) - top - 2), tight = h < 40, past = isToday && Date.parse(e.end) <= now;
       const sub = tight ? '' : `<span>${timeStr(e.start)}–${timeStr(e.end)}${e.location ? ' · ' + esc(e.location.split('\n')[0]) : ''}${e.attendeeCount > 1 ? ` · ${e.attendeeCount} people` : ''}</span>`;
-      html += `<button class="tev ${e.busy ? '' : 'n'} ${past ? 'past' : ''} ${nextEv === e ? 'next' : ''}" data-ev="${esc(evKey(e))}" style="top:${top}px;height:${h}px;${pos}"><b>${esc(e.title)}${tight ? ' · ' + timeStr(e.start) : ''}</b>${sub}</button>`;
+      html += `<button class="tev ${e.busy ? '' : 'n'} ${past ? 'past' : ''} ${nextEv === e ? 'next' : ''}" data-ev="${esc(evKey(e))}" style="top:${top}px;height:${h}px;${pos}${multi && e.calendar ? `border-left-color:${calColor(e.calendar)};` : ''}"><b>${esc(e.title)}${tight ? ' · ' + timeStr(e.start) : ''}</b>${sub}</button>`;
     } else {
       const t = it.t;
       html += `<div class="ttk" style="top:${top}px;height:30px;${pos}"><button class="chk" data-done="${t.id}" aria-label="Mark done">✓</button><button class="nm" data-task="${t.id}">${esc(t.title)} · ${hm(it.s)}</button></div>`;
@@ -586,7 +642,7 @@ function dayHtml() {
   const stale = S.status.cal && !S.status.cal.ok && c ? `<div class="errbox">Could not refresh the calendar: ${esc(S.status.cal.message)}<br>Showing the copy from ${new Date(c.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.</div>` : '';
   const calMsg = !c ? `<p class="empty">${connected() ? (loading ? 'Loading your calendar…' : S.status.cal && !S.status.cal.ok ? esc(S.status.cal.message) : 'Nothing loaded yet.') : 'Connect Google in Settings to see your meetings.'}</p>` : '';
   return `<div class="hd"><div><h1>${parseYmd(d).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}</h1><div class="mu">${esc(sub)}</div></div>${pill(isToday ? '' : '<button class="pill" data-act="today">Today</button>')}</div>
-    ${weekHtml(d)}
+    ${weekHtml(d)}${miniMonthHtml(d)}
     <div class="stack">
     ${isToday ? dayCheckinHtml(d, needReview) : d <= today() ? trackCard(d) : ''}${isToday ? portfolioLine() : ''}
     ${allDay.length ? `<div class="allday">${allDay.map(e => `<span>${esc(e.title)}</span>`).join('')}</div>` : ''}
@@ -594,7 +650,7 @@ function dayHtml() {
     ${trayHtml(d, b)}
     <h2 style="font-size:16px;margin:12px 2px 8px">Agenda</h2>
     ${sh ? `<p class="shape"><b>${sh.count} meeting${sh.count > 1 ? 's' : ''}</b> · ${dur(sh.mins)} booked${sh.free ? ` · longest free block <b>${timeStr(sh.free[0])}–${timeStr(sh.free[1])}</b>` : ''}</p>` : ''}
-    ${calMsg}${timelineHtml(d, timed, b.timed)}${stale}
+    ${calMsg}${calLegendHtml(c)}${timelineHtml(d, timed, b.timed, c)}${stale}
     ${c && c.errors && c.errors.length ? `<div class="errbox">Some calendars could not be read: ${esc(c.errors.map(e => e.calendar).join(', '))}</div>` : ''}
     </div>`;
 }
@@ -1425,6 +1481,7 @@ document.addEventListener('click', ev => {
 });
 async function act(a) {
   if (a === 'wprev') { viewDate = addDays(viewDate, -7); render(); loadDay(viewDate); }
+  else if (a === 'mprev' || a === 'mnext') { const cur = mmSel && mmSel.forDate === viewDate ? mmSel.m : viewDate.slice(0, 7), dd = new Date(+cur.slice(0, 4), +cur.slice(5, 7) - 1 + (a === 'mnext' ? 1 : -1), 1); mmSel = { m: ymd(dd).slice(0, 7), forDate: viewDate }; render(); }
   else if (a === 'wnext') { viewDate = addDays(viewDate, 7); render(); loadDay(viewDate); }
   else if (a === 'supp-add') { const t = (prompt('Supplement name') || '').trim().slice(0, 40); if (t && !suppList().some(x => x.toLowerCase() === t.toLowerCase())) { S.settings.supplements = [...suppList(), t]; save(); render(); } }
   else if (a === 'lock-unlock') lockUnlock();
