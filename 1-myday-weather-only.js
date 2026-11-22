@@ -2114,7 +2114,7 @@ function mergeSharedCalendar(date) {
   return { ...p, events:[...(p.events||[]).filter(e=>!sharedIds.has(`${e.uid}|${e.start}`)),...(sh.events||[])].sort((a,b)=>Date.parse(a.start)-Date.parse(b.start)), calendars:[...new Set([...(p.calendars||[]),...(sh.calendars||[])])],calendarList:[...(p.calendarList||[]),...(sh.calendarList||[])],errors:[...(p.errors||[]),...(sh.errors||[])] };
 }
 function sharedCalendarWarning() {
-  if (!S.sharedConnection?.connected) return '';
+  if (!S.sharedConnection?.connected && !S.sharedCalendar?.[viewDate]) return '';
   const st=S.status.sharedCalendar;
   return st && !st.ok ? `<div class="errbox">Shared calendar could not refresh: ${esc(st.message)}${S.sharedCalendar?.[viewDate] ? `<br>Showing its saved copy from ${esc(sharedTime(S.sharedCalendar[viewDate].at))}.` : '<br>Shared events are not loaded.'}</div>` : '';
 }
