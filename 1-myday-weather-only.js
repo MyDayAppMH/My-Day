@@ -1,6 +1,6 @@
 
 'use strict';
-const BUILD = '2026-11-22.calendars.alarm.shared';
+const BUILD = '2026-11-22.calendars.alarm.shared.1';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -2099,8 +2099,8 @@ function taskSourceState() {
   const s=shared?.ok ? `Shared · updated ${sharedTime(shared.at)}` : S.sharedTasks ? `Shared · saved ${sharedTime(S.sharedTasks.at)}` : 'Shared · not loaded';
   let warning='';
   if (shared && !shared.ok) warning=`<div class="errbox">${esc(shared.message)}${S.sharedTasks ? '<br>Showing saved shared tasks. Shared changes are paused.' : '<br>Shared tasks are not loaded, not an empty list.'}<br><button class="btn" style="font-size:12px;min-height:36px;padding:6px 9px" data-act="shared-settings">Shared task settings</button> <button class="btn" style="font-size:12px;min-height:36px;padding:6px 9px" data-act="shared-refresh">Refresh</button></div>`;
-  else if (!S.sharedConnection?.connected) warning='<div class="mu" style="margin-top:8px">Shared Google Tasks are not connected. <button class="mini" data-act="shared-settings">Set up</button></div>';
-  else if (!S.sharedConnection.list) warning='<div class="mu" style="margin-top:8px">Choose the shared task list in Settings. <button class="mini" data-act="shared-settings">Choose list</button></div>';
+  else if (!S.sharedConnection?.connected) warning='<div class="mu" style="margin-top:8px">Shared Google Tasks are not connected. <button class="btn" style="font-size:12px;min-height:36px;padding:6px 9px" data-act="shared-settings">Set up</button></div>';
+  else if (!S.sharedConnection.list) warning='<div class="mu" style="margin-top:8px">Choose the shared task list in Settings. <button class="btn" style="font-size:12px;min-height:36px;padding:6px 9px" data-act="shared-settings">Choose list</button></div>';
   return `<div class="mu" style="font-size:11px;margin:7px 0;display:flex;gap:12px;flex-wrap:wrap"><span>${esc(p)}</span><span>${esc(s)}</span></div>${warning}`;
 }
 function mergeSharedCalendar(date) {
