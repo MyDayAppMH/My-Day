@@ -649,8 +649,7 @@ function dayHtml() {
     ${nextUpHtml(d, timed)}
     ${trayHtml(d, b)}
     <h2 style="font-size:16px;margin:12px 2px 8px">Agenda</h2>
-    ${sh ? `<p class="shape"><b>${sh.count} meeting${sh.count > 1 ? 's' : ''}</b> · ${dur(sh.mins)} booked${sh.free ? ` · longest free block <b>${timeStr(sh.free[0])}–${timeStr(sh.free[1])}</b>` : ''}</p>` : ''}
-    ${calMsg}${calLegendHtml(c)}${timelineHtml(d, timed, b.timed, c)}${stale}
+      ${calMsg}${calLegendHtml(c)}${timelineHtml(d, timed, b.timed, c)}${stale}
     ${c && c.errors && c.errors.length ? `<div class="errbox">Some calendars could not be read: ${esc(c.errors.map(e => e.calendar).join(', '))}</div>` : ''}
     </div>`;
 }
