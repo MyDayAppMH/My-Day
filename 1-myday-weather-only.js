@@ -1,6 +1,6 @@
 
 'use strict';
-const BUILD = '2026-11-22.calendars.alarm';
+const BUILD = '2026-11-22.calendars.alarm.shared';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -395,6 +395,7 @@ const post = (path, b) => api(path, { method: 'POST', body: JSON.stringify(b) })
 async function loadDay(date) {
   if (!connected()) return;
   loading = true; if (view === 'today' || view === 'review') render();
+  const sharedLoad = loadSharedSources(date);
   const from = parseYmd(date).toISOString(), to = parseYmd(addDays(date, 1)).toISOString();
   const [cal, tasks, health] = await Promise.allSettled([
     api(`/api/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`),
@@ -414,6 +415,7 @@ async function loadDay(date) {
   if (health.status === 'fulfilled') { mergeHealth(health.value); S.status.health = { at, ok: !health.value.errors?.length, message: (health.value.errors || []).map(e => `${e.type}: ${e.message}`).join('\n') }; }
   else S.status.health = { at, ok: false, message: health.reason.message };
   for (const d of Object.keys(S.cache).sort().slice(0, -21)) delete S.cache[d]; // keep the 21 most recent days
+  await sharedLoad;
   loading = false; save(); render();
 }
 function mergeHealth(out) { for (const [d, v] of Object.entries(out.days || {})) S.health[d] = Object.assign(S.health[d] || {}, v); S.healthAt = Date.now(); }
@@ -545,7 +547,7 @@ function isoWeek(s) { const d = parseYmd(s); d.setDate(d.getDate() + 3 - ((d.get
 function mmGrid(ym) { const first = ym + '-01', start = weekStart(first), last = ymd(new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0)), end = addDays(weekStart(last), 6); const days = []; for (let d = start; d <= end; d = addDays(d, 1)) days.push(d); return days; }
 function mmDots(ym) {
   const dots = {}, add = e => { if (!e.allDay && !calHidden(e.calendar)) dots[ymd(new Date(e.start))] = 1; };
-  for (const c of Object.values(S.cache)) (c.events || []).forEach(add);
+  for (const c of [...Object.values(S.cache),...Object.values(S.sharedCalendar||{})]) (c.events || []).forEach(add);
   const m = mmCache[ym]; if (m) m.events.forEach(add);
   return dots;
 }
@@ -567,8 +569,8 @@ function miniMonthHtml(date) {
 /* ----- calendar colours ----- */
 const CAL_PALETTE = ['#60a5fa', '#fb923c', '#4ade80', '#c084fc', '#f472b6', '#facc15', '#2dd4bf', '#f87171'];
 const calHidden = name => !!(name && (S.settings.hiddenCals || []).includes(name));
-const calNames = () => { const s = [], add = n => { if (n && !s.includes(n)) s.push(n); }; (S.settings.hiddenCals || []).forEach(add); for (const c of Object.values(S.cache)) (c.calendars || []).forEach(add); return s; };
-const evWritableCals = () => { for (const c of Object.values(S.cache)) { if (Array.isArray(c.calendarList) && c.calendarList.length) { const w = c.calendarList.filter(x => x && x.id && (x.primary || x.accessRole === 'owner' || x.accessRole === 'writer')); if (w.length) return w; } } return []; };
+const calNames = () => { const s = [], add = n => { if (n && !s.includes(n)) s.push(n); }; (S.settings.hiddenCals || []).forEach(add); for (const c of [...Object.values(S.cache),...Object.values(S.sharedCalendar||{})]) (c.calendars || []).forEach(add); return s; };
+const evWritableCals = () => { for (const c of Object.values(S.cache)) { if (Array.isArray(c.calendarList) && c.calendarList.length) { const w = c.calendarList.filter(x => x && x.id && !x.readOnly && (x.accessRole === 'owner' || x.accessRole === 'writer')); if (w.length) return w; } } return []; };
 function calColor(name) {
   const m = S.settings.calColors || (S.settings.calColors = {});
   if (!(name in m)) { m[name] = Object.keys(m).length % CAL_PALETTE.length; setTimeout(save, 0); }
@@ -600,13 +602,16 @@ function bucketTasks(open, date) {
   return b;
 }
 function taskRow(t, done) {
-  const d = dueDay(t), meta = [d && d !== viewDate ? `due ${shortDate(d)}` : '', t.types.join(', '), t.crm ? 'CRM' : '', t.status === 'In progress' ? 'in progress' : ''].filter(Boolean).join(' · ');
-  return `<div class="task ${done ? 'done' : ''}"><button class="chk ${done ? 'on' : ''}" data-done="${t.id}" aria-label="${done ? 'Mark not done' : 'Mark done'}">✓</button>
-    <button class="tt" data-task="${t.id}"><span class="tn">${esc(t.title)}</span>${meta ? `<span class="sub">${esc(meta)}</span>` : ''}</button></div>`;
+  const shared=isSharedTask(t), disabled=shared && (!sharedTaskEditable() || sharedPendingTasks.has(t.id));
+  const color=shared?sharedTaskColor():'var(--task)';
+  const d=dueDay(t), parent=shared && t.parent ? (S.sharedTasks?.open||[]).find(p=>p.upstreamId===t.parent) : null;
+  const meta=[d && d!==viewDate?'due '+shortDate(d):'',...(t.types||[]),t.crm?'CRM':'',t.status==='In progress'?'in progress':'',shared&&t.parent?'Subtask'+(parent?' of '+parent.title:''):''].filter(Boolean).join(' · ');
+  return `<div class="task ${done?'done':''}" style="border-left:3px solid ${color};padding-left:8px;${disabled?'opacity:.58;':''}"><button class="chk ${done?'on':''}" data-done="${esc(t.id)}" style="border-color:${color};color:${color}" aria-label="${done?'Mark not done':'Mark done'}" ${disabled?'disabled':''}>✓</button><button class="tt" data-task="${esc(t.id)}"><span class="tn">${esc(t.title)}</span><span class="sub"><i style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${color};margin-right:5px"></i>${shared?'Shared · Google Tasks':'Personal · Notion'}</span>${meta?`<span class="sub">${esc(meta)}</span>`:''}</button></div>`;
 }
+
 function trayHtml(date, b) {
-  const st = S.status.tasks, T = S.tasks;
-  if (!T) return `<div class="card"><h3>To-dos</h3><p class="empty">${connected() ? (loading ? 'Loading your tasks…' : st && !st.ok ? esc(st.message) : 'Nothing loaded yet.') : 'Connect in Settings to see your Notion tasks.'}</p><button class="addrow" data-act="add-task">+ Add task</button></div>`;
+  const st = S.status.tasks, T = combinedTasks();
+  if (!T) return `<div class="card"><h3>To-dos</h3>${taskSourceState()}<p class="empty">${connected() ? (loading ? 'Loading your tasks…' : st && !st.ok ? esc(st.message) : 'Nothing loaded yet.') : 'Connect in Settings to see your Notion tasks.'}</p><button class="addrow" data-act="add-task">+ Add task</button></div>`;
   const grp = (label, list, cls = '', total = list.length) => list.length ? `<div class="grouphd ${cls}"><span>${label}</span><span>${total}</span></div>${list.map(t => taskRow(t)).join('')}` : '';
   // At most five rows at first; the rest is one tap away.
   let room = trayAll ? 1e9 : 5; const cap = list => { const part = list.slice(0, room); room -= part.length; return part; };
@@ -616,7 +621,7 @@ function trayHtml(date, b) {
   const done = date === today() ? (T.doneOn[today()] || []) : [];
   const open = S.settings.trayOpen !== false;
   return `<details class="card tray" id="tray" ${open ? 'open' : ''}><summary><span>To-dos · ${top}${b.timed.length ? ` <span class="muted" style="font-weight:400;font-size:13px">(${b.timed.length} on the timeline)</span>` : ''}</span><button class="mini" data-act="add-task">+ Add</button></summary>
-    <div class="body">
+    <div class="body">${taskSourceState()}
     ${grp('Overdue', overdueShow, 'bad', b.overdue.length)}${grp(date === today() ? 'Due today' : 'Due ' + dayLabel(date).toLowerCase(), dueShow, '', b.onDay.length)}${hiddenN ? `<button class="showall" data-act="tray-all">Show ${hiddenN} more ›</button>` : (trayAll && b.overdue.length + b.onDay.length > 5 ? '<button class="showall" data-act="tray-all">Show fewer</button>' : '')}
     ${top - b.timed.length ? '' : `<p class="empty">${b.timed.length ? 'Everything else is on the timeline below.' : 'Nothing due. Clear day.'}</p>`}
     ${more + done.length ? `<details style="margin-top:8px"><summary class="muted" style="font-size:14px;cursor:pointer">${more ? `${more} more: in progress, soon, waiting, no date` : ''}${more && done.length ? ' · ' : ''}${done.length ? `${done.length} done today` : ''}</summary>${grp('In progress', b.progress)}${grp('Next three days', b.soon)}${grp('Waiting on others', b.waiting)}${grp('No date', b.nodate)}${done.length ? `<div class="grouphd"><span>Done today</span><span>${done.length}</span></div>${done.map(t => taskRow(t, true)).join('')}` : ''}</details>` : ''}
@@ -665,11 +670,11 @@ function timelineHtml(date, timed, tasks, cal) {
   return `<div class="tl" data-start="${lo}" style="height:${(hi - lo) * HH}px">${html}</div>`;
 }
 function dayHtml() {
-  const d = viewDate, isToday = d === today(), c = S.cache[d], ev = c ? c.events.filter(e => !calHidden(e.calendar)) : [], now = Date.now();
+  const d = viewDate, isToday = d === today(), c = mergeSharedCalendar(d), ev = c ? c.events.filter(e => !calHidden(e.calendar)) : [], now = Date.now();
   const timed = ev.filter(e => !e.allDay), allDay = ev.filter(e => e.allDay), upcoming = isToday ? timed.find(e => Date.parse(e.end) > now) : null;
   const sub = isToday ? (upcoming ? (Date.parse(upcoming.start) <= now ? `Now: ${upcoming.title}` : `Next: ${upcoming.title} in ${untilStr(Date.parse(upcoming.start) - now)}`) : (timed.length ? 'Nothing more today' : 'No meetings today'))
     : (timed.length ? `${timed.length} meeting${timed.length > 1 ? 's' : ''}` : 'No meetings');
-  const b = bucketTasks(S.tasks ? S.tasks.open : [], d), sh = c ? dayShape(ev, d) : null;
+  const b = bucketTasks(combinedTasks()?.open || [], d), sh = c ? dayShape(ev, d) : null;
   const y = addDays(today(), -1), needReview = isToday && !(S.reviews[y] && (S.reviews[y].mood || S.reviews[y].did)) && new Date().getHours() < 14;
   const stale = S.status.cal && !S.status.cal.ok && c ? `<div class="errbox">Could not refresh the calendar: ${esc(S.status.cal.message)}<br>Showing the copy from ${new Date(c.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}.</div>` : '';
   const calMsg = !c ? `<p class="empty">${connected() ? (loading ? 'Loading your calendar…' : S.status.cal && !S.status.cal.ok ? esc(S.status.cal.message) : 'Nothing loaded yet.') : 'Connect Google in Settings to see your meetings.'}</p>` : '';
@@ -679,7 +684,7 @@ function dayHtml() {
     ${isToday ? dayCheckinHtml(d, needReview) : d <= today() ? trackCard(d) : ''}${isToday ? portfolioLine() : ''}${isToday ? wakeCardHtml() : ''}
     ${allDay.length ? `<div class="allday">${allDay.map(e => `<span>${esc(e.title)}</span>`).join('')}</div>` : ''}
     ${nextUpHtml(d, timed)}
-    ${trayHtml(d, b)}
+    ${trayHtml(d, b)}${sharedCalendarWarning()}
     <h2 style="font-size:16px;margin:12px 2px 8px">Agenda</h2>
       ${calMsg}${calLegendHtml(c)}${timelineHtml(d, timed, b.timed, c)}${stale}
     ${c && c.errors && c.errors.length ? `<div class="errbox">Some calendars could not be read: ${esc(c.errors.map(e => e.calendar).join(', '))}</div>` : ''}
@@ -1241,6 +1246,7 @@ function settingsHtml() {
       <p class="muted" style="margin-top:0">Choose which Google calendars My Day shows. Hidden calendars stay untouched in Google Calendar; this only changes this phone. New calendars appear here after a refresh.</p>
       <div class="chips">${calNames().length ? calNames().map(n => `<button class="chip ${calHidden(n) ? '' : 'on'}" data-cal="${esc(n)}">${esc(n)}${calHidden(n) ? ' ✕' : ''}</button>`).join('') : '<span class="muted">No calendars loaded yet. Use Refresh everything in Connection first.</span>'}</div>
       <p class="muted" style="font-size:12px;margin:8px 0 0">Tap a calendar to show or hide it.</p></div></details>
+    ${sharedSettingsHtml()}
     ${secOpenTag('alarm', 'Alarm')}
       <p class="muted">One-tap wake-up times on the Day tab. ${infoHtml('alarm', 'MyDay sends the time as a web request to the automation app on your phone (for example MacroDroid), and that app sets the alarm in Sleep. Paste the app\u2019s webhook link below. MyDay cannot see whether the alarm fired, so check Sleep the first time.')}</p>
       <label class="lbl2" for="alarmHook">Alarm webhook link</label>
@@ -1287,7 +1293,7 @@ function openSheet(html) {
 }
 function closeSheet() { if (mic.on && mic.key === 'qa') micStop(); $('overlay').innerHTML = ''; }
 function findEvent(key) {
-  for (const c of Object.values(S.cache)) { const e = c.events.find(x => evKey(x) === key); if (e) return e; }
+  for (const c of [...Object.values(S.sharedCalendar||{}),...Object.values(S.cache)]) { const e = c.events.find(x => evKey(x) === key); if (e) return e; }
   return null;
 }
 const RESP = { accepted: '✓', declined: '✗', tentative: '?', needsAction: '·' };
@@ -1315,7 +1321,7 @@ function openEvent(key) {
     try { const r = crmCache[key] || await crmPending[key]; ids = (r ? r.people : []).map(p => p.id); } catch { /* note is still created, just without attendees */ }
     startMeetingNote({ title: e.title, start: e.start, end: e.end, attendees: ids });
   };
-  loadBrief(e, key); loadThreads(e, key);
+  if(e.source!=='shared-google'){loadBrief(e, key); loadThreads(e, key);}
 }
 
 /* ---- CRM context for the people in a meeting (Notion People database, read only) ---- */
@@ -1370,6 +1376,7 @@ function demoThreads() {
 
 function openTask(id) {
   const t = findTask(id); if (!t) return;
+  if(isSharedTask(t))return openSharedTask(t);
   openSheet(`<h2>${esc(t.title)}</h2>
     <p class="muted" style="margin:2px 0 10px">${[t.status, dueDay(t) ? 'due ' + shortDate(dueDay(t)) + (hasTime(t) ? ' ' + hm(minutesIn(dueDay(t), t.due)) : '') : 'no due date', t.types.join(', ')].filter(Boolean).join(' · ')}</p>
     ${t.next ? `<span class="lbl2">Next step</span><div>${linkify(t.next)}</div>` : ''}
@@ -1380,39 +1387,41 @@ function openTask(id) {
   $('tClose').onclick = closeSheet;
 }
 function findTask(id) {
-  if (!S.tasks) return null;
-  return S.tasks.open.find(t => t.id === id) || Object.values(S.tasks.doneOn).flat().find(t => t.id === id) || null;
+  const tasks=combinedTasks();if (!tasks) return null;
+  return tasks.open.find(t => t.id === id) || Object.values(tasks.doneOn).flat().find(t => t.id === id) || null;
 }
 function openAddTask(o = {}) {
-  const person = o.person;
-  let due = o.date || (viewDate >= today() ? viewDate : today()), type = '';
-  const draw = () => {
-    $('dueChips').innerHTML = [[today(), 'Today'], [addDays(today(), 1), 'Tomorrow'], ['', 'No date']].map(([d, l]) => `<button class="chip ${due === d ? 'on' : ''}" data-d="${d}">${l}</button>`).join('');
-    $('typeChips').innerHTML = [['', 'None'], ['Personal', 'Personal'], ['Work', 'Work']].map(([v, l]) => `<button class="chip ${type === v ? 'on' : ''}" data-t="${v}">${l}</button>`).join('');
-    $('dueChips').querySelectorAll('button').forEach(b => b.onclick = () => { due = b.dataset.d; $('dueDate').value = due; draw(); });
-    $('typeChips').querySelectorAll('button').forEach(b => b.onclick = () => { type = b.dataset.t; draw(); });
+  const person=o.person, personalOnly=!!(person||o.notes);
+  let due=o.date||(viewDate>=today()?viewDate:today()), type='', source='personal';
+  openSheet(`<h2>New task</h2><p class="muted" id="taskDestination">Goes into your personal Notion task database.</p><span class="lbl2">Save to</span><div class="chips" id="sourceChips"><button class="chip on" data-source="personal">Personal</button><button class="chip" data-source="shared" ${personalOnly||!sharedTaskEditable()?'disabled':''}>Shared</button></div>${personalOnly?'<p class="mu">Mail/CRM-linked tasks stay personal. Shared tasks never inherit private notes or links.</p>':!sharedTaskEditable()?'<p class="mu">Connect and refresh the shared list in Settings to add shared tasks.</p>':''}<input class="field" id="tTitle" placeholder="What needs doing?" maxlength="200" value="${esc(o.title||'')}" autofocus><span class="lbl2">Due</span><div class="chips" id="dueChips"></div><input class="field" id="dueDate" type="date" value="${due}"><div id="personalType"><span class="lbl2">Type</span><div class="chips" id="typeChips"></div></div><div class="row" style="margin-top:16px"><button class="btn day" id="tSave">Add task</button><button class="btn" id="tCancel">Cancel</button></div>`);
+  const draw=()=>{
+    $('dueChips').innerHTML=[[today(),'Today'],[addDays(today(),1),'Tomorrow'],['','No date']].map(([d,l])=>`<button class="chip ${due===d?'on':''}" data-d="${d}">${l}</button>`).join('');
+    $('typeChips').innerHTML=[['','None'],['Personal','Personal'],['Work','Work']].map(([v,l])=>`<button class="chip ${type===v?'on':''}" data-t="${v}">${l}</button>`).join('');
+    $('dueChips').querySelectorAll('button').forEach(b=>b.onclick=()=>{due=b.dataset.d;$('dueDate').value=due;draw();});
+    $('typeChips').querySelectorAll('button').forEach(b=>b.onclick=()=>{type=b.dataset.t;draw();});
+    $('sourceChips').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.source===source);b.onclick=()=>{source=b.dataset.source;$('personalType').hidden=source==='shared';$('taskDestination').textContent=source==='shared'?'Shared with anyone using the selected list in anaymatti@gmail.com.':'Goes into your personal Notion task database.';draw();};});
   };
-  openSheet(`<h2>New task</h2><p class="muted" style="margin:2px 0 8px">Goes straight into your Notion task database${person ? `, linked to ${esc(person.name || 'this person')} in your CRM` : ''}.</p>
-    <input class="field" id="tTitle" placeholder="${person ? `e.g. Follow up with ${esc(person.name)}` : 'What needs doing?'}" maxlength="200" value="${esc(o.title || '')}" autofocus>
-    <span class="lbl2">Due</span><div class="chips" id="dueChips"></div>
-    <input class="field" id="dueDate" type="date" value="${due}">
-    <span class="lbl2">Type</span><div class="chips" id="typeChips"></div>
-    <div class="row" style="margin-top:16px"><button class="btn day" id="tSave">Add task</button><button class="btn" id="tCancel">Cancel</button></div>`);
-  draw();
-  $('dueDate').onchange = () => { due = $('dueDate').value; draw(); };
-  $('tCancel').onclick = closeSheet;
-  $('tSave').onclick = async () => {
-    const title = $('tTitle').value.trim(); if (!title) return $('tTitle').focus();
-    $('tSave').disabled = true;
-    try {
-      if (S.tasks === null) S.tasks = { at: Date.now(), open: [], doneOn: {} };
-      if (S.demo) S.tasks.open.push({ id: 'demo-' + Date.now(), title, status: 'Not started', due: due || null, done: null, types: type ? [type] : [], tags: [], waiting: false, crm: !!person, people: [], next: '', url: '#' });
-      else { const r = await post('/api/tasks/add', { title, due: due || undefined, type: type || undefined, person: person ? person.id : undefined, notes: o.notes || undefined }); S.tasks.open.push(r.task); }
-      save(); closeSheet(); render(); toast('Task added');
-    } catch (e) { $('tSave').disabled = false; toast('Could not add: ' + e.message); }
+  draw();$('dueDate').onchange=()=>{due=$('dueDate').value;draw();};$('tCancel').onclick=closeSheet;
+  $('tSave').onclick=async()=>{
+    const title=$('tTitle').value.trim();if(!title)return $('tTitle').focus();
+    $('tSave').disabled=true;
+    try{
+      if(source==='shared'){
+        if(!sharedTaskEditable()||personalOnly)throw Error('Refresh shared tasks before adding.');
+        const r=await post('/api/shared-tasks/add',{title,due:due||undefined});
+        S.sharedTasks=S.sharedTasks||{at:Date.now(),open:[],doneOn:{}};S.sharedTasks.open.push(r.task);S.sharedTasks.at=Date.now();
+      }else{
+        if(S.tasks===null)S.tasks={at:Date.now(),open:[],doneOn:{}};
+        if(S.demo)S.tasks.open.push({id:'demo-'+Date.now(),title,status:'Not started',due:due||null,done:null,types:type?[type]:[],tags:[],waiting:false,crm:!!person,people:[],next:'',url:'#'});
+        else{const r=await post('/api/tasks/add',{title,due:due||undefined,type:type||undefined,person:person?person.id:undefined,notes:o.notes||undefined});S.tasks.open.push(r.task);}
+      }
+      save();closeSheet();render();toast(source==='shared'?'Shared task added':'Task added');
+    }catch(e){if(source==='shared'){S.status.sharedTasks={ok:false,at:Date.now(),message:'Could not confirm the shared task add. Refresh the list before retrying.'};save();closeSheet();render();toast('Could not confirm the add. Refresh shared tasks before retrying.');}else{if($('tSave'))$('tSave').disabled=false;toast('Could not add: '+e.message);}}
   };
 }
+
 function toggleTask(id) {
+  const shared=findTask(id);if(isSharedTask(shared))return toggleSharedTask(shared);
   const T = S.tasks, t = findTask(id); if (!t || !T) return;
   const wasDone = t.status === 'Done', doneList = T.doneOn[today()] || (T.doneOn[today()] = []);
   const prevStatus = wasDone ? 'Not started' : t.status;
@@ -1848,7 +1857,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 /** A small ⓘ that shows or hides an explanation, so long notes do not take space until you want them. */
 const infoHtml = (id, text) => `<button type="button" class="infoi" data-info="${id}" aria-expanded="false" aria-label="More information">ⓘ</button><p class="infotxt muted" id="info-${id}" hidden>${text}</p>`;
 const secIsOpen = id => !!(S.settings.secOpen || {})[id];
-const SECTIONS = [['connection', 'Connection'], ['display', 'Display'], ['calendars', 'Calendars'], ['alarm', 'Alarm'], ['tags', 'Tags'], ['supps', 'Supplements'], ['dictation', 'Dictation'], ['lock', 'App lock'], ['backup', 'Backup'], ['data', 'Your data'], ['about', 'About']];
+const SECTIONS = [['connection', 'Connection'], ['display', 'Display'], ['calendars', 'Calendars'], ['shared', 'Shared tasks'], ['alarm', 'Alarm'], ['tags', 'Tags'], ['supps', 'Supplements'], ['dictation', 'Dictation'], ['lock', 'App lock'], ['backup', 'Backup'], ['data', 'Your data'], ['about', 'About']];
 function secSummary(id) {
   const ago = () => { const l = SharedBackup.lastOk(); return l ? SharedBackup.ago(new Date(l).toISOString()) : 'not yet'; };
   return { connection: connected() ? 'Connected' : 'Not connected', display: S.settings.theme === 'light' ? 'Light' : S.settings.theme === 'auto' ? 'Match phone' : 'Dark', alarm: alarmHook() ? 'Set up' : 'Not set up', calendars: (() => { const n = calNames(); return n.length ? `${n.length - (S.settings.hiddenCals || []).filter(x => n.includes(x)).length} of ${n.length} shown` : ''; })(), tags: String(S.tags.length + SPORT_TAGS.length + BASE_TAGS.length), supps: String(suppList().length), dictation: (DICT_LANGS.find(x => x[0] === (S.settings.dictLang || '')) || DICT_LANGS[0])[1], lock: lockEnabled() ? 'On' : 'Off', backup: SharedBackup.configured() ? ago() : 'Not set up', data: '', about: BUILD }[id] || '';
@@ -2068,6 +2077,146 @@ document.addEventListener('touchend', e => {
 }, { passive: true });
 document.addEventListener('touchcancel', () => { swipe = null; }, { passive: true });
 
+/* ---------------- combined personal / shared tasks ---------------- */
+const sharedTime = at => at ? new Date(at).toLocaleString([], { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) : 'never';
+const isSharedTask = t => t && t.source === 'shared-google';
+const sharedTaskReady = () => !!(S.sharedConnection?.connected && S.sharedConnection?.list);
+const sharedTaskEditable = () => sharedTaskReady() && !!S.status.sharedTasks?.ok;
+const sharedCalendarName = () => {
+  for (const c of Object.values(S.sharedCalendar || {})) if (c.calendars?.[0]) return c.calendars[0];
+  return 'anaymatti@gmail.com';
+};
+const sharedTaskColor = () => calColor(sharedCalendarName());
+function combinedTasks() {
+  if (!S.tasks && !S.sharedTasks) return null;
+  const personal=S.tasks || {open:[],doneOn:{}}, shared=S.sharedTasks || {open:[],doneOn:{}};
+  const days=new Set([...Object.keys(personal.doneOn||{}),...Object.keys(shared.doneOn||{})]);
+  return {open:[...(personal.open||[]),...(shared.open||[])].sort((a,b)=>(a.due||'9999').localeCompare(b.due||'9999') || a.title.localeCompare(b.title)),doneOn:Object.fromEntries([...days].map(d=>[d,[...(personal.doneOn?.[d]||[]),...(shared.doneOn?.[d]||[])]]))};
+}
+function taskSourceState() {
+  const personal=S.status.tasks, shared=S.status.sharedTasks;
+  const p=personal?.ok ? `Personal · updated ${sharedTime(personal.at)}` : S.tasks ? `Personal · saved ${sharedTime(S.tasks.at)}` : 'Personal · not loaded';
+  const s=shared?.ok ? `Shared · updated ${sharedTime(shared.at)}` : S.sharedTasks ? `Shared · saved ${sharedTime(S.sharedTasks.at)}` : 'Shared · not loaded';
+  let warning='';
+  if (shared && !shared.ok) warning=`<div class="errbox">${esc(shared.message)}${S.sharedTasks ? '<br>Showing saved shared tasks. Shared changes are paused.' : '<br>Shared tasks are not loaded, not an empty list.'}<br><button class="btn" style="font-size:12px;min-height:36px;padding:6px 9px" data-act="shared-settings">Shared task settings</button> <button class="btn" style="font-size:12px;min-height:36px;padding:6px 9px" data-act="shared-refresh">Refresh</button></div>`;
+  else if (!S.sharedConnection?.connected) warning='<div class="mu" style="margin-top:8px">Shared Google Tasks are not connected. <button class="mini" data-act="shared-settings">Set up</button></div>';
+  else if (!S.sharedConnection.list) warning='<div class="mu" style="margin-top:8px">Choose the shared task list in Settings. <button class="mini" data-act="shared-settings">Choose list</button></div>';
+  return `<div class="mu" style="font-size:11px;margin:7px 0;display:flex;gap:12px;flex-wrap:wrap"><span>${esc(p)}</span><span>${esc(s)}</span></div>${warning}`;
+}
+function mergeSharedCalendar(date) {
+  const personal=S.cache[date];
+  const shared=S.sharedCalendar?.[date];
+  if (!personal && !shared) return null;
+  const p=personal||{events:[],calendars:[],calendarList:[],errors:[]};
+  const sh=shared||{events:[],calendars:[],calendarList:[],errors:[]};
+  const sharedIds=new Set((sh.events||[]).map(e=>`${e.uid}|${e.start}`));
+  // Prefer the separately read shared event if also present through the personal account.
+  return { ...p, events:[...(p.events||[]).filter(e=>!sharedIds.has(`${e.uid}|${e.start}`)),...(sh.events||[])].sort((a,b)=>Date.parse(a.start)-Date.parse(b.start)), calendars:[...new Set([...(p.calendars||[]),...(sh.calendars||[])])],calendarList:[...(p.calendarList||[]),...(sh.calendarList||[])],errors:[...(p.errors||[]),...(sh.errors||[])] };
+}
+function sharedCalendarWarning() {
+  if (!S.sharedConnection?.connected) return '';
+  const st=S.status.sharedCalendar;
+  return st && !st.ok ? `<div class="errbox">Shared calendar could not refresh: ${esc(st.message)}${S.sharedCalendar?.[viewDate] ? `<br>Showing its saved copy from ${esc(sharedTime(S.sharedCalendar[viewDate].at))}.` : '<br>Shared events are not loaded.'}</div>` : '';
+}
+let sharedLoadSerial=0;
+async function loadSharedSources(date) {
+  if (!connected() || S.demo) return;
+  const serial=++sharedLoadSerial;
+  let connection;
+  try {
+    connection=await api('/api/shared-tasks/status');
+    if (serial!==sharedLoadSerial) return;
+    const old=S.sharedConnection;
+    S.sharedConnection={...connection,available:true};
+    if (old?.list?.id && old.list.id!==connection.list?.id) S.sharedTasks=null;
+  } catch (e) {
+    if (serial!==sharedLoadSerial) return;
+    S.sharedConnection={...(S.sharedConnection||{}),available:false};
+    S.status.sharedTasks={ok:false,at:Date.now(),message:'Shared connection service is unavailable. '+e.message};
+    S.status.sharedCalendar={ok:false,at:Date.now(),message:'Shared connection service is unavailable.'};
+    save();return;
+  }
+  if (!connection.connected) {
+    S.status.sharedTasks={ok:false,at:Date.now(),message:'Connect the shared anaymatti@gmail.com account in Settings.'};
+    S.status.sharedCalendar={ok:false,at:Date.now(),message:'Shared Google account is not connected.'};
+    save();return;
+  }
+  const from=parseYmd(date).toISOString(),to=parseYmd(addDays(date,1)).toISOString();
+  const [tasks,calendar]=await Promise.allSettled([connection.list ? api(`/api/shared-tasks?date=${date}`) : Promise.reject(new Error('Choose an existing shared task list in Settings.')),api(`/api/shared-calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`)]);
+  if (serial!==sharedLoadSerial) return;
+  const at=Date.now();
+  if (tasks.status==='fulfilled') {
+    const previous=S.sharedTasks||{doneOn:{}};
+    S.sharedTasks={at,open:tasks.value.open,doneOn:{...previous.doneOn,[date]:tasks.value.doneOn}};
+    S.status.sharedTasks={ok:true,at,message:''};
+  } else S.status.sharedTasks={ok:false,at,message:tasks.reason.message};
+  if (calendar.status==='fulfilled') {
+    S.sharedCalendar=S.sharedCalendar||{};
+    S.sharedCalendar[date]={...calendar.value,at};
+    for(const d of Object.keys(S.sharedCalendar).sort().slice(0,-21))delete S.sharedCalendar[d];
+    S.status.sharedCalendar={ok:true,at,message:''};
+    // Once the actual calendar name is known, it is the same colour map as the legend.
+    if (calendar.value.calendars?.[0]) calColor(calendar.value.calendars[0]);
+  } else S.status.sharedCalendar={ok:false,at,message:calendar.reason.message};
+  save();
+}
+function sharedSettingsHtml() {
+  const c=S.sharedConnection||{};
+  return `<details class="card" id="sec-shared"><summary style="font-weight:600;cursor:pointer">Shared Google Tasks</summary><div style="margin-top:10px"><p class="muted">Personal tasks stay in Notion. Shared tasks use anaymatti@gmail.com, together in To-dos without switching accounts. Its calendar is read-only and uses the same colour.</p>
+    <p class="mu">${c.connected ? 'Shared Google account connected.' : 'Shared Google account not connected.'}${c.list ? '<br>Selected list: '+esc(c.list.title) : '<br>No shared list selected.'}</p>
+    <p class="mu">Google asks for task read/write access to all lists in this account, calendar read access, and account email verification. MyDay uses only the shared list you select. No Gmail or Drive access.</p>
+    <div class="row" style="flex-wrap:wrap"><button class="btn" data-act="shared-check">Check shared connection</button><button class="btn day" data-act="shared-connect" ${c.available ? '' : 'disabled'}>${c.connected?'Reconnect shared Google':'Connect shared Google'}</button><button class="btn" data-act="shared-lists" ${c.connected?'':'disabled'}>Choose task list</button></div>
+    ${!c.available?'<p class="mu">Check the connection first. Setup is enabled only when the shared connection service is available.</p>':''}<p class="mu">${S.status.sharedTasks && !S.status.sharedTasks.ok ? esc(S.status.sharedTasks.message) : S.sharedTasks ? 'Tasks last updated '+esc(sharedTime(S.sharedTasks.at)) : ''}</p></div></details>`;
+}
+async function sharedConnectionCheck() {
+  await loadSharedSources(viewDate);render();
+  const el=$('sec-shared');if(el){el.open=true;el.scrollIntoView({block:'start'});}
+}
+function connectSharedGoogle() {
+  if (!connected() || !S.sharedConnection?.available) return toast('Check the shared connection in Settings first.');
+  const base=baseUrl();
+  if (base!=='https://calorie-tracker.matthias-homan.workers.dev') return toast('Check the connection service address before connecting shared Google.');
+  // A user gesture posts the existing key to the owning service, never a URL or chat.
+  const form=document.createElement('form');form.method='POST';form.action=base+'/auth/start';form.target='_blank';form.style.display='none';
+  for(const [name,value] of Object.entries({service:'shared-tasks',key:S.settings.appKey})){const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;form.append(input);}
+  document.body.append(form);form.submit();form.remove();
+}
+async function chooseSharedList() {
+  try {
+    const out=await api('/api/shared-tasks/lists');
+    openSheet(`<h2>Shared task list</h2><p class="muted">Existing lists in anaymatti@gmail.com. Choosing one makes its tasks visible here. No new list is created.</p>${out.lists.length ? `<select class="field" id="sharedListChoice">${out.lists.map(x=>`<option value="${esc(x.id)}" ${S.sharedConnection?.list?.id===x.id?'selected':''}>${esc(x.title)}</option>`).join('')}</select><button class="btn day" style="margin-top:14px" id="sharedListSave">Use this shared list</button>`:'<p>No task lists were returned. Create a list in Google Tasks first, then refresh here.</p>'}<button class="btn" style="margin-top:14px" id="sharedListCancel">Cancel</button>`);
+    $('sharedListCancel').onclick=closeSheet;
+    if($('sharedListSave'))$('sharedListSave').onclick=async()=>{const button=$('sharedListSave');button.disabled=true;try{const chosen=await post('/api/shared-tasks/select',{listId:$('sharedListChoice').value});S.sharedConnection.list=chosen.list;S.sharedTasks=null;save();closeSheet();await loadDay(viewDate);toast('Shared list selected');}catch(e){button.disabled=false;toast(e.message);}};
+  } catch(e){toast('Could not load shared lists: '+e.message);}
+}
+const sharedPendingTasks=new Set();
+async function toggleSharedTask(task) {
+  if(!sharedTaskEditable())return toast('Refresh shared tasks before changing them.');
+  if(sharedPendingTasks.has(task.id))return;
+  sharedPendingTasks.add(task.id);render();
+  const action=task.status==='Done'?'reopen':'done';
+  try {
+    const result=await post('/api/shared-tasks/'+action,{upstreamId:task.upstreamId,listId:task.listId,etag:task.etag});
+    const updated=result.task;
+    S.sharedTasks.open=S.sharedTasks.open.filter(t=>t.id!==task.id);
+    for(const d of Object.keys(S.sharedTasks.doneOn))S.sharedTasks.doneOn[d]=S.sharedTasks.doneOn[d].filter(t=>t.id!==task.id);
+    if(updated.status==='Done'){const d=updated.done||today();(S.sharedTasks.doneOn[d]||=([])).push(updated);}else S.sharedTasks.open.push(updated);
+    S.sharedTasks.at=Date.now();save();toast(action==='done'?'Shared task completed':'Shared task reopened');
+  } catch(e){S.status.sharedTasks={ok:false,at:Date.now(),message:e.message};save();toast('Could not confirm the shared task update. Refresh before retrying: '+e.message);}
+  finally{sharedPendingTasks.delete(task.id);render();}
+}
+function openSharedTask(task) {
+  openSheet(`<h2>${esc(task.title)}</h2><p class="muted">Shared · Google Tasks${task.due?' · '+esc(shortDate(task.due)):''}</p>${task.notes?'<p>'+linkify(task.notes)+'</p>':''}<div class="row" style="margin-top:14px;flex-wrap:wrap"><button class="btn day" id="sharedDone" ${sharedTaskEditable()?'':'disabled'}>${task.status==='Done'?'Mark not done':'Mark done'}</button>${task.url?'<a class="btn" href="'+esc(task.url)+'" target="_blank" rel="noopener">Open in Google Tasks</a>':''}<button class="btn" id="sharedClose">Close</button></div>`);
+  $('sharedClose').onclick=closeSheet;$('sharedDone').onclick=()=>{closeSheet();toggleSharedTask(task);};
+}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act;
+  if(a==='shared-settings'){go('settings');const el=$('sec-shared');if(el){el.open=true;el.scrollIntoView({block:'start'});}}
+  if(a==='shared-refresh')loadDay(viewDate);
+  if(a==='shared-check')sharedConnectionCheck();
+  if(a==='shared-connect')connectSharedGoogle();
+  if(a==='shared-lists')chooseSharedList();
+});
+
 /* ---------- boot ---------- */
 applyTheme();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
@@ -2104,4 +2253,3 @@ setInterval(() => { if (view === 'portfolio' && !document.hidden && !$('overlay'
 setInterval(() => { if (!document.hidden) refreshMadridWeather(); if (rollDay() && connected() && !$('overlay').innerHTML) loadDay(viewDate); if (view === 'today' && viewDate === today() && !$('overlay').innerHTML && !document.hidden && !(document.activeElement && document.activeElement.id === 'rdchkNote')) render(); }, 60 * 1000); // keeps the now-line and "next" label current
 
 // Republish verified Sports layout after a stalled hosting build.
-
