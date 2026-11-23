@@ -98,8 +98,14 @@ function mailTime(ms) {
 
 /* ---------- state ---------- */
 function blank() { return { reviews: {}, prep: {}, health: {}, cache: {}, tasks: null, inbox: null, tags: [], crypto: { holdings: [], quotes: {}, at: 0 }, settings: { baseUrl: '', appKey: '', theme: 'dark', hideBalances: false, weekDays: 7, hiddenCals: [] }, status: {}, healthAt: 0, demo: false }; }
+function applySharedBlueMigration(settings) {
+  if (settings.sharedBlue20261123) return false;
+  settings.calColors = Object.assign({}, settings.calColors, { 'anaymatti@gmail.com': 0 });
+  settings.sharedBlue20261123 = true;
+  return true;
+}
 function load() {
-  try { const o = JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); const s = Object.assign(blank(), o); s.settings = Object.assign(blank().settings, o.settings); return s; }
+  try { const o = JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); const s = Object.assign(blank(), o); s.settings = Object.assign(blank().settings, o.settings); if (applySharedBlueMigration(s.settings)) setTimeout(save, 0); return s; }
   catch { return blank(); }
 }
 function save() {
