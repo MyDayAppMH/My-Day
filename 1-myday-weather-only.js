@@ -751,7 +751,7 @@ function wakeCardHtml() {
   return `<div class="card layout-checkin"><div class="ctitle cardhead"><b class="ckh">Wake up</b> <span class="muted">\u00b7 sets it in your sleep app</span></div>
     <div class="rdbox"><div class="chips" style="margin:0">${alarmTimes().map(t => `<button class="chip" data-wake="${esc(t)}">${esc(t)}</button>`).join('')}<button class="chip" data-act="wake-pick">Pick a time\u2026</button></div>
     ${alarmHook() ? '' : '<p class="muted" style="font-size:12px;margin:8px 0 0">One-time setup: paste your alarm webhook under More \u203a Settings \u203a Alarm.</p>'}
-    ${last ? `<p class="muted" style="font-size:12px;margin:6px 0 0">Last request ${esc(last.time)} \u00b7 received ${esc(new Date(last.at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }))}. Check Sleep to confirm it is set.</p>` : ''}</div></div>`;
+    ${last ? `<div style="margin:10px 0 0"><div style="font-weight:600;font-size:15px">Requested ${esc(last.time)}</div><div class="muted" style="font-size:12px;margin-top:1px">received ${esc(new Date(last.at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }))} \u00b7 check Sleep to confirm it is set</div></div>` : ''}</div></div>`;
 }
 async function sendWake(time) {
   const base = alarmHook();
