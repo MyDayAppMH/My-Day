@@ -682,10 +682,10 @@ function dayHtml() {
     ${weekHtml(d)}${miniMonthHtml(d)}${weatherHtml()}
     <div class="stack">
     ${isToday ? dayCheckinHtml(d, needReview) : d <= today() ? trackCard(d) : ''}${isToday ? portfolioLine() : ''}${isToday ? wakeCardHtml() : ''}
-    ${allDay.length ? `<div class="allday">${allDay.map(e => `<span>${esc(e.title)}</span>`).join('')}</div>` : ''}
     ${nextUpHtml(d, timed)}
     ${trayHtml(d, b)}${sharedCalendarWarning()}
     <h2 style="font-size:16px;margin:12px 2px 8px">Agenda</h2>
+    ${allDay.length ? `<div class="allday">${allDay.map(e => `<span>${esc(e.title)}</span>`).join('')}</div>` : ''}
       ${calMsg}${calLegendHtml(c)}${timelineHtml(d, timed, b.timed, c)}${stale}
     ${c && c.errors && c.errors.length ? `<div class="errbox">Some calendars could not be read: ${esc(c.errors.map(e => e.calendar).join(', '))}</div>` : ''}
     </div>`;
