@@ -474,7 +474,7 @@ const LAYOUT_STYLES = `<style>
 .qaprev{margin-top:12px;padding:12px 14px}.qaprev .seg{margin-bottom:10px}.qat{font-size:17px;font-weight:600;overflow-wrap:anywhere}.qaw{margin-top:4px;font-size:14px}
 .lockbox{text-align:center;padding:30px 18px}.lockbox .big{font-size:38px}
 </style>`;
-let suppOpen = false, trayAll = false, dayCheckOpen = false, reviewDetailsOpen = false;
+let wakeOpen = false, suppOpen = false, trayAll = false, dayCheckOpen = false, reviewDetailsOpen = false;
 function render() {
   sportsSyncReview();
   const active = { history: 'more', settings: 'more', portfolio: 'more' }[view] || view, unread = S.inbox ? S.inbox.unread : 0;
@@ -748,8 +748,9 @@ const alarmTimes = () => (Array.isArray(S.settings.alarmTimes) && S.settings.ala
 const alarmHook = () => (S.settings.alarmWebhook || '').trim();
 function wakeCardHtml() {
   const last = S.settings.alarmLast;
-  return `<div class="card layout-checkin"><div class="ctitle cardhead"><b class="ckh">Wake up</b> <span class="muted">\u00b7 sets it in your sleep app</span></div>
-    <div class="rdbox"><div class="chips" style="margin:0">${alarmTimes().map(t => `<button class="chip" data-wake="${esc(t)}">${esc(t)}</button>`).join('')}<button class="chip" data-act="wake-pick">Pick a time\u2026</button></div>
+  if (!wakeOpen) return `<div class="card layout-checkin"><div class="ckrow one cardhead"><div><b class="ckh">Wake up</b></div><button class="layout-log" data-act="wake-toggle">Set alarm</button></div></div>`;
+  return `<div class="card layout-checkin"><div class="ckrow one cardhead"><div><b class="ckh">Wake up</b></div><button class="layout-log" data-act="wake-toggle">Hide</button></div>
+    <div class="rdbox"><div class="muted" style="font-size:12px;margin:-4px 0 8px">sets it in your sleep app</div><div class="chips" style="margin:0">${alarmTimes().map(t => `<button class="chip" data-wake="${esc(t)}">${esc(t)}</button>`).join('')}<button class="chip" data-act="wake-pick">Pick a time\u2026</button></div>
     ${alarmHook() ? '' : '<p class="muted" style="font-size:12px;margin:8px 0 0">One-time setup: paste your alarm webhook under More \u203a Settings \u203a Alarm.</p>'}
     ${last ? `<div style="margin:10px 0 0"><div style="font-weight:600;font-size:15px">Requested ${esc(last.time)}</div><div class="muted" style="font-size:12px;margin-top:1px">received ${esc(new Date(last.at).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' }))} \u00b7 check Sleep to confirm it is set</div></div>` : ''}</div></div>`;
 }
@@ -1611,6 +1612,7 @@ async function act(a) {
     if (add.length) { patchReview({ did: (cur ? cur.trimEnd() + '\n' : '') + add.join('\n') }); render(); }
   }
   else if (a === 'clear-review') { if (confirm('Clear this day\'s review?')) { delete S.reviews[reviewDate]; save(); render(); } }
+  else if (a === 'wake-toggle') { wakeOpen = !wakeOpen; render(); }
   else if (a === 'wake-pick') openWakePicker();
   else if (a === 'alarm-save') { saveAlarmSettings(); toast('Saved'); }
   else if (a === 'save-conn') { saveConn(); toast('Saved'); }
