@@ -1,6 +1,6 @@
 
 'use strict';
-const BUILD = '2026-11-22.calendars.alarm.shared.1';
+const BUILD = '2026-11-25.grateful.1';
 const STORE_KEY = 'myday.v1';
 const MEETINGS_DB_URL = 'https://www.notion.so/6311b06337a4468bb661111f32c063b2';
 const TASKS_DB_URL = 'https://www.notion.so/2e2e528fadf88195bcedf39c537ae294';
@@ -113,6 +113,8 @@ function save() {
   catch { toast('Could not save: browser storage is full or blocked.'); }
 }
 let S = load();
+// The gratitude journal counts missed days and the streak only from the day it first runs here.
+if (!S.settings.gratefulSince) { S.settings.gratefulSince = today(); save(); }
 let view = 'today';
 let viewDate = today();
 let reviewDate = addDays(today(), -1); // the review is about the previous day, so the steps and calendar are complete
@@ -687,7 +689,7 @@ function dayHtml() {
   return `<div class="hd"><div><h1>${parseYmd(d).toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })}</h1><div class="mu">${esc(sub)}</div></div>${pill(isToday ? '' : '<button class="pill" data-act="today">Today</button>')}</div>
     ${weekHtml(d)}${miniMonthHtml(d)}${weatherHtml()}
     <div class="stack">
-    ${isToday ? dayCheckinHtml(d, needReview) : d <= today() ? trackCard(d) : ''}${isToday ? portfolioLine() : ''}${isToday ? wakeCardHtml() : ''}
+    ${isToday ? dayCheckinHtml(d, needReview) : d <= today() ? trackCard(d) + gPastHtml(d) : ''}${isToday ? portfolioLine() : ''}${isToday ? wakeCardHtml() : ''}
     ${nextUpHtml(d, timed)}
     ${trayHtml(d, b)}${sharedCalendarWarning()}
     <h2 style="font-size:16px;margin:12px 2px 8px">Agenda</h2>
@@ -733,14 +735,64 @@ function readinessCheckHtml(d, r, entry) {
     <input class="field" id="rdchkNote" maxlength="300" placeholder="Comment (optional)" value="${esc(note)}" autocomplete="off">
     <div class="rdchk-btns" style="margin-top:8px">${Object.entries(RDCHK).map(([k, l]) => `<button class="ckbtn${done && c.v === k ? ' sel' : ''}" data-rdchk="${k}">${l}</button>`).join('')}</div></div>`;
 }
+/* ----- gratitude journal: thankful lines saved in the day entry itself, so the daily backup and restore already cover them ----- */
+let gEdit = null, gDraft = ''; // gEdit: line being edited; gDraft keeps an unsaved new line while the screen redraws
+const gList = d => (S.reviews[d] && Array.isArray(S.reviews[d].grateful) ? S.reviews[d].grateful : []);
+function gSet(d, list) {
+  const r = { ...(S.reviews[d] || {}), grateful: list, updatedAt: Date.now() };
+  const empty = !r.mood && !r.energy && !r.alcohol && !r.sex && !r.travel && !r.ill && !suppsTaken(r).length && !r.water && !drinkTotal(r) && !(r.tags || []).length && !(r.did || '').trim() && !(r.win || '').trim() && !r.readinessCheck && !list.length;
+  if (empty) delete S.reviews[d]; else S.reviews[d] = r;
+  save();
+}
+// Consecutive days with a line, counting back from today; a quiet today does not break it until tomorrow. Days before launch never count.
+function gStreak() {
+  const since = S.settings.gratefulSince; if (!since) return 0;
+  let d = gList(today()).length ? today() : addDays(today(), -1), n = 0;
+  while (d >= since && gList(d).length) { n++; d = addDays(d, -1); }
+  return n;
+}
+// Oldest day since launch without a line, plus how many more are missing after it. Never counts today or pre-launch days.
+function gMissed() {
+  const since = S.settings.gratefulSince; if (!since) return null;
+  let d = addDays(today(), -1), oldest = null, count = 0;
+  while (d >= since) { if (!gList(d).length) { count++; oldest = d; } d = addDays(d, -1); }
+  return oldest ? { date: oldest, more: count - 1 } : null;
+}
+const gTime = at => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+function gRows(d) {
+  return gList(d).map(e => gEdit === e.id
+    ? `<div style="margin:0 2px 8px"><input class="field" style="margin:0;width:100%;box-sizing:border-box" id="gEditField" maxlength="300" value="${esc(e.text)}" autocomplete="off"><div style="display:flex;gap:8px;margin-top:8px"><button class="btn day" style="flex:1" data-gact="save" data-date="${d}" data-id="${e.id}">Save</button><button class="btn" style="flex:1" data-gact="cancel">Cancel</button></div></div>`
+    : `<div style="display:flex;align-items:center;gap:6px;font-size:13px;line-height:1.6"><button data-gact="edit" data-date="${d}" data-id="${e.id}" style="flex:1;min-width:0;text-align:left;border:0;background:none;padding:2px 0;color:inherit;font:inherit;cursor:pointer">${esc(e.text)} <span class="muted">· ${gTime(e.at)}</span></button><button class="layout-log" style="padding:4px 6px" data-gact="del" data-date="${d}" data-id="${e.id}" aria-label="Delete this line">✕</button></div>`).join('');
+}
+function gAddRow(d, placeholder) {
+  return `<div style="display:flex;gap:8px"><input class="field" style="margin:0" id="gNew" maxlength="300" placeholder="${placeholder}" value="${esc(gDraft)}" autocomplete="off"><button class="btn day" style="flex:none" data-gact="add" data-date="${d}">Add</button></div>`;
+}
+// The journal lives inside the Today-so-far card for today, and as its own card under the day's summary for past dates.
+function gSectionHtml(d) {
+  const n = gStreak(), list = gList(d);
+  return `<div id="grateful" style="border-top:1px solid var(--line);margin-top:12px;padding-top:10px"><div><b style="font-size:13px">Grateful</b> <span class="muted" style="font-size:12px">${n ? `· ${n}-day streak ` : ''}· since ${esc(shortDate(S.settings.gratefulSince))}</span></div>${list.length ? '<div class="muted" style="font-size:12px;margin:4px 2px 2px">Tap a line to edit it.</div>' : '<div class="muted" style="font-size:12px;margin:4px 2px 6px">Add a line any time today, as many as you like.</div>'}<div style="margin:0 2px 8px">${gRows(d)}</div>${gAddRow(d, 'Today I\u2019m grateful for\u2026')}</div>`;
+}
+function gPastHtml(d) {
+  return `<div class="card layout-checkin" id="grateful"><div class="ctitle cardhead"><b class="ckh">Grateful</b> <span class="muted">· ${esc(rdDate(d))}</span></div><div style="padding:2px 12px 12px">${gList(d).length ? '<div class="muted" style="font-size:12px;margin:6px 2px 2px">Tap a line to edit it.</div>' : ''}<div style="margin:0 2px 8px">${gRows(d)}</div>${gAddRow(d, 'Add a line for this day\u2026')}</div></div>`;
+}
+function gAct(a, d, id) {
+  const list = gList(d);
+  if (a === 'add') { const t = (($('gNew') ? $('gNew').value : gDraft) || '').trim().slice(0, 300); if (!t) return; gDraft = ''; gSet(d, [...list, { id: 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text: t, at: Date.now() }]); render(); }
+  else if (a === 'del') { if (gEdit === id) gEdit = null; gSet(d, list.filter(e => e.id !== id)); render(); }
+  else if (a === 'edit') { gDraft = $('gNew') ? $('gNew').value : gDraft; gEdit = id; render(); }
+  else if (a === 'save') { const t = ($('gEditField') ? $('gEditField').value : '').trim().slice(0, 300); gEdit = null; if (t) gSet(d, list.map(e => e.id === id ? { ...e, text: t } : e)); render(); }
+  else if (a === 'cancel') { gEdit = null; render(); }
+  else if (a === 'goto') { gDraft = ''; gEdit = null; viewDate = d; render(); loadDay(viewDate); const el = $('grateful'); if (el) el.scrollIntoView({ block: 'start' }); }
+}
 function dayCheckinHtml(d, needReview) {
   const r = readiness(d), entry = S.reviews[d] || {}, h = S.health[d] || {}, locked = lockedNow();
   // One line that is always visible: steps, HRV, calories burned and water. Tap the chevron for the detail and the counters.
-  const line = [r.pending ? 'Readiness pending' : '', h.steps != null ? `${fmt(h.steps)} steps` : '', typeof h.hrv === 'number' ? `HRV ${Math.round(h.hrv)} ms` : '', h.caloriesOut != null ? `${fmt(h.caloriesOut)} kcal` : '', `💧 ${entry.water || 0}`, drank(entry) ? `🍺 ${drinkTotal(entry)}` : ''].filter(Boolean).map(x => `<span style="white-space:nowrap">${esc(x)}</span>`).join(' · ');
+  const line = [r.pending ? 'Readiness pending' : '', h.steps != null ? `${fmt(h.steps)} steps` : '', typeof h.hrv === 'number' ? `HRV ${Math.round(h.hrv)} ms` : '', h.caloriesOut != null ? `${fmt(h.caloriesOut)} kcal` : '', `💧 ${entry.water || 0}`, drank(entry) ? `🍺 ${drinkTotal(entry)}` : '', gList(d).length ? `🙏 ${gList(d).length}` : ''].filter(Boolean).map(x => `<span style="white-space:nowrap">${esc(x)}</span>`).join(' · ');
   const review = needReview ? `<div class="card ycard cardhead"><span><b class="ckh">Review</b> <span class="muted">· ${esc(rdDate(addDays(d, -1)))} · not logged</span></span><button class="layout-log" data-act="review-yesterday">Log it ›</button></div>` : '';
+  const gm = gMissed(), gmiss = gm ? `<div class="card ycard cardhead"><span><b class="ckh">Grateful</b> <span class="muted">· nothing on ${esc(rdDate(gm.date))}${gm.more ? ` · + ${gm.more} more` : ''}</span></span><button class="layout-log" data-gact="goto" data-date="${gm.date}">Add it ›</button></div>` : '';
   const check = r.pending ? '' : `<div class="card layout-checkin">${readinessCheckHtml(d, r, entry)}</div>`;
-  const today = `<div class="card layout-checkin"><div class="ctitle cardhead"><b class="ckh">Today so far</b> <span class="muted">· ${esc(rdDate(d))}</span></div><details class="layout-checkin" id="dayCheckDetails" ${dayCheckOpen ? 'open' : ''}><summary><span class="muted ckline">${line}</span><span class="layout-chevron">⌄</span><span class="ckbtns"><button class="ckbtn layout-water" data-cnt data-date="${d}" data-key="water" data-by="1" aria-label="Add a glass of water">+ 💧 Water</button>${drank(entry) && !locked ? `<button class="ckbtn layout-beer" data-cnt data-date="${d}" data-key="beer" data-by="1" aria-label="Add a beer">+ 🍺 Beer</button>` : ''}</span></summary><div class="layout-checkin-content">${r.pending ? readinessCard(d) : ''}${healthLine(d, false)}<div class="track" style="margin-top:8px">${trackHtml(d, false, locked)}</div></div></details></div>`;
-  return review + check + today;
+  const today = `<div class="card layout-checkin"><div class="ctitle cardhead"><b class="ckh">Today so far</b> <span class="muted">· ${esc(rdDate(d))}</span></div><details class="layout-checkin" id="dayCheckDetails" ${dayCheckOpen ? 'open' : ''}><summary><span class="muted ckline">${line}</span><span class="layout-chevron">⌄</span><span class="ckbtns"><button class="ckbtn layout-water" data-cnt data-date="${d}" data-key="water" data-by="1" aria-label="Add a glass of water">+ 💧 Water</button>${drank(entry) && !locked ? `<button class="ckbtn layout-beer" data-cnt data-date="${d}" data-key="beer" data-by="1" aria-label="Add a beer">+ 🍺 Beer</button>` : ''}</span></summary><div class="layout-checkin-content">${r.pending ? readinessCard(d) : ''}${healthLine(d, false)}<div class="track" style="margin-top:8px">${trackHtml(d, false, locked)}</div>${gSectionHtml(d)}</div></details></div>`;
+  return review + gmiss + check + today;
 }
 /* ----- wake-up alarm: one tap sends the time to the automation app on your phone, which sets it in Sleep ----- */
 const ALARM_DEFAULT_TIMES = ['06:30', '07:00', '07:30'];
@@ -965,7 +1017,7 @@ function historyHtml() {
   const logged = days.filter(d => S.reviews[d]);
   const list = [...logged].reverse().map(d => {
     const r = S.reviews[d], h = S.health[d] || {};
-    const sub = [(r.tags || []).join(', '), r.energy ? `energy ${r.energy}/5` : '', h.sleepMinutes != null ? `slept ${dur(h.sleepMinutes)}` : '', h.steps != null ? `${fmt(h.steps)} steps` : '', drinkTotal(r) ? `${drinkTotal(r)} drink${drinkTotal(r) === 1 ? '' : 's'}` : '', r.water ? `${litres(r.water)} L water` : '', r.travel ? 'travelling' : '', r.ill ? 'ill or injured' : ''].filter(Boolean).join(' · ');
+    const sub = [(r.tags || []).join(', '), r.energy ? `energy ${r.energy}/5` : '', h.sleepMinutes != null ? `slept ${dur(h.sleepMinutes)}` : '', h.steps != null ? `${fmt(h.steps)} steps` : '', (r.grateful || []).length ? `🙏 ${r.grateful.length}` : '', drinkTotal(r) ? `${drinkTotal(r)} drink${drinkTotal(r) === 1 ? '' : 's'}` : '', r.water ? `${litres(r.water)} L water` : '', r.travel ? 'travelling' : '', r.ill ? 'ill or injured' : ''].filter(Boolean).join(' · ');
     const text = (r.win || r.did || '').split('\n')[0];
     return `<button class="hrow" data-rev="${d}"><span class="em">${r.mood ? MOODS[r.mood - 1][0] : '•'}</span><span><span class="hd2">${shortDate(d)}</span><span class="sub">${esc(sub)}</span>${text ? `<span class="sub" style="color:var(--ink)">${esc(text.slice(0, 120))}</span>` : ''}</span></button>`;
   }).join('');
@@ -1031,7 +1083,7 @@ let saveTimer;
 function patchDay(date, patch) {
   const r = S.reviews[date] || (S.reviews[date] = {});
   Object.assign(r, patch, { updatedAt: Date.now() });
-  const empty = !r.mood && !r.energy && !r.alcohol && !r.sex && !r.travel && !r.ill && !suppsTaken(r).length && !r.water && !drinkTotal(r) && !(r.tags || []).length && !(r.did || '').trim() && !(r.win || '').trim() && !r.readinessCheck;
+  const empty = !r.mood && !r.energy && !r.alcohol && !r.sex && !r.travel && !r.ill && !suppsTaken(r).length && !r.water && !drinkTotal(r) && !(r.tags || []).length && !(r.did || '').trim() && !(r.win || '').trim() && !r.readinessCheck && !(r.grateful || []).length;
   if (empty) delete S.reviews[date];
   save();
 }
@@ -1529,7 +1581,7 @@ function bind(root) {
   root.querySelectorAll('[data-hold]').forEach(b => b.onclick = () => openHolding(+b.dataset.hold));
   root.querySelectorAll('[data-cnt]').forEach(b => b.onclick = () => { bump(b.dataset.date, b.dataset.key, +b.dataset.by); render(); });
   root.querySelectorAll('[data-flag]').forEach(b => b.onchange = () => { setFlag(b.dataset.date, b.dataset.flag, b.checked); render(); });
-  root.querySelectorAll('[data-day]').forEach(b => b.onclick = () => { viewDate = b.dataset.day; render(); loadDay(viewDate); });
+  root.querySelectorAll('[data-day]').forEach(b => b.onclick = () => { viewDate = b.dataset.day; gDraft = ''; gEdit = null; render(); loadDay(viewDate); });
   root.querySelectorAll('[data-mf]').forEach(b => b.onclick = () => { mailFilter = b.dataset.mf; render(); });
   root.querySelectorAll('[data-mopen]').forEach(b => b.onclick = () => toggleMail(b.dataset.mopen));
   root.querySelectorAll('[data-mtask]').forEach(b => b.onclick = () => openMailTask(b.dataset.mtask));
@@ -1544,6 +1596,9 @@ function bind(root) {
   root.querySelectorAll('[data-wake]').forEach(b => b.onclick = () => sendWake(b.dataset.wake));
   root.querySelectorAll('[data-rdchk]').forEach(b => b.onclick = () => { const v = b.dataset.rdchk, n = ($('rdchkNote') ? $('rdchkNote').value : '').trim().slice(0, 300); if (!RDCHK[v]) return; rdDraft = null; rdOpen = false; patchDay(today(), { readinessCheck: { v, note: n, score: readiness(today()).score, at: Date.now() } }); render(); });
   const rdNote = $('rdchkNote'); if (rdNote) rdNote.oninput = () => { rdDraft = rdNote.value; };
+  root.querySelectorAll('[data-gact]').forEach(b => b.onclick = () => gAct(b.dataset.gact, b.dataset.date, b.dataset.id));
+  const gNewEl = $('gNew'); if (gNewEl) gNewEl.oninput = () => { gDraft = gNewEl.value; };
+  const gEditEl = $('gEditField'); if (gEditEl) { gEditEl.focus(); gEditEl.setSelectionRange(gEditEl.value.length, gEditEl.value.length); }
   if (view === 'review' && !viewLocked(view)) bindReview(root);
   if (view === 'settings') { const f = $('importFile'); if (f) f.onchange = importData; bindLock(); const dl = $('dictLang'); if (dl) dl.onchange = () => { S.settings.dictLang = dl.value; save(); }; }
   const checkDetails = root.querySelector('#dayCheckDetails');
