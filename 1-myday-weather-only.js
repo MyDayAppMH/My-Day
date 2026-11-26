@@ -1455,17 +1455,18 @@ function findTask(id) {
 }
 function openAddTask(o = {}) {
   const person=o.person, personalOnly=!!(person||o.notes);
-  let due=o.date||(viewDate>=today()?viewDate:today()), type='', source=o.list?'list:'+o.list:'personal';
+  const dueDefault=()=>o.date||(viewDate>=today()?viewDate:today());
+  let source=o.list?'list:'+o.list:'personal', dueTouched=!!o.date, due=source.startsWith('list:')&&!o.date?'':dueDefault(), type='';
   openSheet(`<h2>New task</h2><p class="muted" id="taskDestination">Goes into your personal Notion task database.</p><span class="lbl2">Save to</span><div class="chips" id="sourceChips"><button class="chip on" data-source="personal">Personal</button><button class="chip" data-source="shared" ${personalOnly||!sharedTaskEditable()?'disabled':''}>Shared</button>${sharedExtras().map(x=>`<button class="chip" data-source="list:${esc(x.list.id)}" ${personalOnly||!sharedTaskEditable()?'disabled':''}>${esc(x.list.title)}</button>`).join('')}</div>${personalOnly?'<p class="mu">Mail/CRM-linked tasks stay personal. Shared tasks never inherit private notes or links.</p>':!sharedTaskEditable()?'<p class="mu">Connect and refresh the shared list in Settings to add shared tasks.</p>':''}<input class="field" id="tTitle" placeholder="What needs doing?" maxlength="200" value="${esc(o.title||'')}" autofocus><span class="lbl2">Due</span><div class="chips" id="dueChips"></div><input class="field" id="dueDate" type="date" value="${due}"><div id="personalType"><span class="lbl2">Type</span><div class="chips" id="typeChips"></div></div><div class="row" style="margin-top:16px"><button class="btn day" id="tSave">Add task</button><button class="btn" id="tCancel">Cancel</button></div>`);
   const draw=()=>{
     $('dueChips').innerHTML=[[today(),'Today'],[addDays(today(),1),'Tomorrow'],['','No date']].map(([d,l])=>`<button class="chip ${due===d?'on':''}" data-d="${d}">${l}</button>`).join('');
     $('typeChips').innerHTML=[['','None'],['Personal','Personal'],['Work','Work']].map(([v,l])=>`<button class="chip ${type===v?'on':''}" data-t="${v}">${l}</button>`).join('');
-    $('dueChips').querySelectorAll('button').forEach(b=>b.onclick=()=>{due=b.dataset.d;$('dueDate').value=due;draw();});
+    $('dueChips').querySelectorAll('button').forEach(b=>b.onclick=()=>{due=b.dataset.d;dueTouched=true;$('dueDate').value=due;draw();});
     $('typeChips').querySelectorAll('button').forEach(b=>b.onclick=()=>{type=b.dataset.t;draw();});
-    $('sourceChips').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.source===source);b.onclick=()=>{source=b.dataset.source;syncSource();draw();};});
+    $('sourceChips').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.source===source);b.onclick=()=>{source=b.dataset.source;if(!dueTouched){due=source.startsWith('list:')?'':dueDefault();$('dueDate').value=due;}syncSource();draw();};});
   };
   const syncSource=()=>{const ex=sharedExtras().find(x=>'list:'+x.list.id===source);$('personalType').hidden=source!=='personal';$('taskDestination').textContent=ex?'Shared '+ex.list.title+' list in anaymatti@gmail.com. Also visible in Google Tasks.':source==='shared'?'Shared with anyone using the selected list in anaymatti@gmail.com.':'Goes into your personal Notion task database.';};
-  draw();syncSource();$('dueDate').onchange=()=>{due=$('dueDate').value;draw();};$('tCancel').onclick=closeSheet;
+  draw();syncSource();$('dueDate').onchange=()=>{due=$('dueDate').value;dueTouched=true;draw();};$('tCancel').onclick=closeSheet;
   const isSh=()=>source==='shared'||source.startsWith('list:');
   $('tSave').onclick=async()=>{
     const title=$('tTitle').value.trim();if(!title)return $('tTitle').focus();
