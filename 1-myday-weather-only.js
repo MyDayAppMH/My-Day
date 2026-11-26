@@ -614,9 +614,13 @@ function taskRow(t, done) {
   const color=shared?sharedTaskColor():'var(--task)';
   const d=dueDay(t), parent=shared && t.parent ? (S.sharedTasks?.open||[]).find(p=>p.upstreamId===t.parent) : null;
   const meta=[d && d!==viewDate?'due '+shortDate(d):'',...(t.types||[]),t.crm?'CRM':'',t.status==='In progress'?'in progress':'',shared&&t.parent?'Subtask'+(parent?' of '+parent.title:''):''].filter(Boolean).join(' · ');
-  return `<div class="task ${done?'done':''}" style="border-left:3px solid ${color};padding-left:8px;${disabled?'opacity:.58;':''}"><button class="chk ${done?'on':''}" data-done="${esc(t.id)}" style="border-color:${color};color:${color}" aria-label="${done?'Mark not done':'Mark done'}" ${disabled?'disabled':''}>✓</button><button class="tt" data-task="${esc(t.id)}"><span class="tn">${esc(t.title)}</span><span class="sub"><i style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${color};margin-right:5px"></i>${shared?'Shared · Google Tasks':'Personal · Notion'}</span>${meta?`<span class="sub">${esc(meta)}</span>`:''}</button></div>`;
+  return `<div class="task ${done?'done':''}" style="border-left:3px solid ${color};padding-left:8px;${disabled?'opacity:.58;':''}"><button class="chk ${done?'on':''}" data-done="${esc(t.id)}" style="border-color:${color};color:${color}" aria-label="${done?'Mark not done':'Mark done'}" ${disabled?'disabled':''}>✓</button><button class="tt" data-task="${esc(t.id)}"><span class="tn">${esc(t.title)}</span><span class="sub"><i style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${color};margin-right:5px"></i>${t.listLabel?esc(t.listLabel):shared?'Shared · Google Tasks':'Personal · Notion'}</span>${meta?`<span class="sub">${esc(meta)}</span>`:''}</button></div>`;
 }
 
+const sharedExtras=()=>(S.sharedTasks&&S.sharedTasks.extras)||[];
+const extraOpen=new Set();
+function toggleExtra(el){if(el.open)extraOpen.add(el.dataset.lid);else extraOpen.delete(el.dataset.lid);}
+function extraSections(){return sharedExtras().map(x=>{const n=x.open.length;return `<details class="extrasec" data-lid="${esc(x.list.id)}" ${extraOpen.has(x.list.id)?'open':''} ontoggle="toggleExtra(this)" style="margin-top:8px"><summary class="muted" style="font-size:14px;cursor:pointer">${esc(x.list.title)} · ${n} item${n===1?'':'s'}</summary>${x.error?`<div class="errbox">${esc(x.error)}</div>`:''}${x.open.slice().sort((a,b)=>a.title.localeCompare(b.title)).map(t=>taskRow({...t,listLabel:'Shared · '+x.list.title})).join('')}<button class="addrow" data-act="add-task-list" data-lid="${esc(x.list.id)}">+ Add to ${esc(x.list.title)}</button></details>`;}).join('');}
 function trayHtml(date, b) {
   const st = S.status.tasks, T = combinedTasks();
   if (!T) return `<div class="card"><h3>To-dos</h3>${taskSourceState()}<p class="empty">${connected() ? (loading ? 'Loading your tasks…' : st && !st.ok ? esc(st.message) : 'Nothing loaded yet.') : 'Connect in Settings to see your Notion tasks.'}</p><button class="addrow" data-act="add-task">+ Add task</button></div>`;
@@ -633,7 +637,7 @@ function trayHtml(date, b) {
     ${grp('Overdue', overdueShow, 'bad', b.overdue.length)}${grp(date === today() ? 'Due today' : 'Due ' + dayLabel(date).toLowerCase(), dueShow, '', b.onDay.length)}${hiddenN ? `<button class="showall" data-act="tray-all">Show ${hiddenN} more ›</button>` : (trayAll && b.overdue.length + b.onDay.length > 5 ? '<button class="showall" data-act="tray-all">Show fewer</button>' : '')}
     ${top - b.timed.length ? '' : `<p class="empty">${b.timed.length ? 'Everything else is on the timeline below.' : 'Nothing due. Clear day.'}</p>`}
     ${more + done.length ? `<details style="margin-top:8px"><summary class="muted" style="font-size:14px;cursor:pointer">${more ? `${more} more: in progress, soon, waiting, no date` : ''}${more && done.length ? ' · ' : ''}${done.length ? `${done.length} done today` : ''}</summary>${grp('In progress', b.progress)}${grp('Next three days', b.soon)}${grp('Waiting on others', b.waiting)}${grp('No date', b.nodate)}${done.length ? `<div class="grouphd"><span>Done today</span><span>${done.length}</span></div>${done.map(t => taskRow(t, true)).join('')}` : ''}</details>` : ''}
-    ${st && !st.ok ? `<div class="errbox">Could not refresh: ${esc(st.message)}</div>` : ''}</div></details>`;
+    ${extraSections()}${st && !st.ok ? `<div class="errbox">Could not refresh: ${esc(st.message)}</div>` : ''}</div></details>`;
 }
 // Side-by-side lanes for overlapping items.
 function layoutLanes(items) {
@@ -1447,35 +1451,40 @@ function openTask(id) {
 }
 function findTask(id) {
   const tasks=combinedTasks();if (!tasks) return null;
-  return tasks.open.find(t => t.id === id) || Object.values(tasks.doneOn).flat().find(t => t.id === id) || null;
+  return tasks.open.find(t => t.id === id) || Object.values(tasks.doneOn).flat().find(t => t.id === id) || sharedExtras().flatMap(x => x.open).find(t => t.id === id) || null;
 }
 function openAddTask(o = {}) {
   const person=o.person, personalOnly=!!(person||o.notes);
-  let due=o.date||(viewDate>=today()?viewDate:today()), type='', source='personal';
-  openSheet(`<h2>New task</h2><p class="muted" id="taskDestination">Goes into your personal Notion task database.</p><span class="lbl2">Save to</span><div class="chips" id="sourceChips"><button class="chip on" data-source="personal">Personal</button><button class="chip" data-source="shared" ${personalOnly||!sharedTaskEditable()?'disabled':''}>Shared</button></div>${personalOnly?'<p class="mu">Mail/CRM-linked tasks stay personal. Shared tasks never inherit private notes or links.</p>':!sharedTaskEditable()?'<p class="mu">Connect and refresh the shared list in Settings to add shared tasks.</p>':''}<input class="field" id="tTitle" placeholder="What needs doing?" maxlength="200" value="${esc(o.title||'')}" autofocus><span class="lbl2">Due</span><div class="chips" id="dueChips"></div><input class="field" id="dueDate" type="date" value="${due}"><div id="personalType"><span class="lbl2">Type</span><div class="chips" id="typeChips"></div></div><div class="row" style="margin-top:16px"><button class="btn day" id="tSave">Add task</button><button class="btn" id="tCancel">Cancel</button></div>`);
+  let due=o.date||(viewDate>=today()?viewDate:today()), type='', source=o.list?'list:'+o.list:'personal';
+  openSheet(`<h2>New task</h2><p class="muted" id="taskDestination">Goes into your personal Notion task database.</p><span class="lbl2">Save to</span><div class="chips" id="sourceChips"><button class="chip on" data-source="personal">Personal</button><button class="chip" data-source="shared" ${personalOnly||!sharedTaskEditable()?'disabled':''}>Shared</button>${sharedExtras().map(x=>`<button class="chip" data-source="list:${esc(x.list.id)}" ${personalOnly||!sharedTaskEditable()?'disabled':''}>${esc(x.list.title)}</button>`).join('')}</div>${personalOnly?'<p class="mu">Mail/CRM-linked tasks stay personal. Shared tasks never inherit private notes or links.</p>':!sharedTaskEditable()?'<p class="mu">Connect and refresh the shared list in Settings to add shared tasks.</p>':''}<input class="field" id="tTitle" placeholder="What needs doing?" maxlength="200" value="${esc(o.title||'')}" autofocus><span class="lbl2">Due</span><div class="chips" id="dueChips"></div><input class="field" id="dueDate" type="date" value="${due}"><div id="personalType"><span class="lbl2">Type</span><div class="chips" id="typeChips"></div></div><div class="row" style="margin-top:16px"><button class="btn day" id="tSave">Add task</button><button class="btn" id="tCancel">Cancel</button></div>`);
   const draw=()=>{
     $('dueChips').innerHTML=[[today(),'Today'],[addDays(today(),1),'Tomorrow'],['','No date']].map(([d,l])=>`<button class="chip ${due===d?'on':''}" data-d="${d}">${l}</button>`).join('');
     $('typeChips').innerHTML=[['','None'],['Personal','Personal'],['Work','Work']].map(([v,l])=>`<button class="chip ${type===v?'on':''}" data-t="${v}">${l}</button>`).join('');
     $('dueChips').querySelectorAll('button').forEach(b=>b.onclick=()=>{due=b.dataset.d;$('dueDate').value=due;draw();});
     $('typeChips').querySelectorAll('button').forEach(b=>b.onclick=()=>{type=b.dataset.t;draw();});
-    $('sourceChips').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.source===source);b.onclick=()=>{source=b.dataset.source;$('personalType').hidden=source==='shared';$('taskDestination').textContent=source==='shared'?'Shared with anyone using the selected list in anaymatti@gmail.com.':'Goes into your personal Notion task database.';draw();};});
+    $('sourceChips').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.source===source);b.onclick=()=>{source=b.dataset.source;syncSource();draw();};});
   };
-  draw();$('dueDate').onchange=()=>{due=$('dueDate').value;draw();};$('tCancel').onclick=closeSheet;
+  const syncSource=()=>{const ex=sharedExtras().find(x=>'list:'+x.list.id===source);$('personalType').hidden=source!=='personal';$('taskDestination').textContent=ex?'Shared '+ex.list.title+' list in anaymatti@gmail.com. Also visible in Google Tasks.':source==='shared'?'Shared with anyone using the selected list in anaymatti@gmail.com.':'Goes into your personal Notion task database.';};
+  draw();syncSource();$('dueDate').onchange=()=>{due=$('dueDate').value;draw();};$('tCancel').onclick=closeSheet;
+  const isSh=()=>source==='shared'||source.startsWith('list:');
   $('tSave').onclick=async()=>{
     const title=$('tTitle').value.trim();if(!title)return $('tTitle').focus();
     $('tSave').disabled=true;
     try{
-      if(source==='shared'){
+      if(isSh()){
         if(!sharedTaskEditable()||personalOnly)throw Error('Refresh shared tasks before adding.');
-        const r=await post('/api/shared-tasks/add',{title,due:due||undefined});
-        S.sharedTasks=S.sharedTasks||{at:Date.now(),open:[],doneOn:{}};S.sharedTasks.open.push(r.task);S.sharedTasks.at=Date.now();
+        const lid=source.startsWith('list:')?source.slice(5):undefined;
+        const r=await post('/api/shared-tasks/add',{title,due:due||undefined,listId:lid});
+        S.sharedTasks=S.sharedTasks||{at:Date.now(),open:[],doneOn:{}};
+        const ex=lid&&sharedExtras().find(x=>x.list.id===lid);
+        if(ex)ex.open.push(r.task);else S.sharedTasks.open.push(r.task);S.sharedTasks.at=Date.now();
       }else{
         if(S.tasks===null)S.tasks={at:Date.now(),open:[],doneOn:{}};
         if(S.demo)S.tasks.open.push({id:'demo-'+Date.now(),title,status:'Not started',due:due||null,done:null,types:type?[type]:[],tags:[],waiting:false,crm:!!person,people:[],next:'',url:'#'});
         else{const r=await post('/api/tasks/add',{title,due:due||undefined,type:type||undefined,person:person?person.id:undefined,notes:o.notes||undefined});S.tasks.open.push(r.task);}
       }
-      save();closeSheet();render();toast(source==='shared'?'Shared task added':'Task added');
-    }catch(e){if(source==='shared'){S.status.sharedTasks={ok:false,at:Date.now(),message:'Could not confirm the shared task add. Refresh the list before retrying.'};save();closeSheet();render();toast('Could not confirm the add. Refresh shared tasks before retrying.');}else{if($('tSave'))$('tSave').disabled=false;toast('Could not add: '+e.message);}}
+      save();closeSheet();render();toast(isSh()?'Shared task added':'Task added');
+    }catch(e){if(isSh()){S.status.sharedTasks={ok:false,at:Date.now(),message:'Could not confirm the shared task add. Refresh the list before retrying.'};save();closeSheet();render();toast('Could not confirm the add. Refresh shared tasks before retrying.');}else{if($('tSave'))$('tSave').disabled=false;toast('Could not add: '+e.message);}}
   };
 }
 
@@ -2210,7 +2219,7 @@ async function loadSharedSources(date) {
   const at=Date.now();
   if (tasks.status==='fulfilled') {
     const previous=S.sharedTasks||{doneOn:{}};
-    S.sharedTasks={at,open:tasks.value.open,doneOn:{...previous.doneOn,[date]:tasks.value.doneOn}};
+    S.sharedTasks={at,open:tasks.value.open,doneOn:{...previous.doneOn,[date]:tasks.value.doneOn},extras:(tasks.value.extras||[]).map(x=>({list:x.list,open:x.open||[],error:x.error||''}))};
     S.status.sharedTasks={ok:true,at,message:''};
   } else S.status.sharedTasks={ok:false,at,message:tasks.reason.message};
   if (calendar.status==='fulfilled') {
@@ -2227,8 +2236,8 @@ function sharedSettingsHtml() {
   const c=S.sharedConnection||{};
   return `<details class="card" id="sec-shared"><summary style="font-weight:600;cursor:pointer">Shared Google Tasks</summary><div style="margin-top:10px"><p class="muted">Personal tasks stay in Notion. Shared tasks use anaymatti@gmail.com, together in To-dos without switching accounts. Its calendar is read-only and uses the same colour.</p>
     <p class="mu">${c.connected ? 'Shared Google account connected.' : 'Shared Google account not connected.'}${c.list ? '<br>Selected list: '+esc(c.list.title) : '<br>No shared list selected.'}</p>
-    <p class="mu">Google asks for task read/write access to all lists in this account, calendar read access, and account email verification. MyDay uses only the shared list you select. No Gmail or Drive access.</p>
-    <div class="row" style="flex-wrap:wrap"><button class="btn" data-act="shared-check">Check shared connection</button><button class="btn day" data-act="shared-connect" ${c.available ? '' : 'disabled'}>${c.connected?'Reconnect shared Google':'Connect shared Google'}</button><button class="btn" data-act="shared-lists" ${c.connected?'':'disabled'}>Choose task list</button></div>
+    <p class="mu">Google asks for task read/write access to all lists in this account, calendar read access, and account email verification. MyDay uses only the shared lists you select. No Gmail or Drive access.</p>
+    <div class="row" style="flex-wrap:wrap"><button class="btn" data-act="shared-check">Check shared connection</button><button class="btn day" data-act="shared-connect" ${c.available ? '' : 'disabled'}>${c.connected?'Reconnect shared Google':'Connect shared Google'}</button><button class="btn" data-act="shared-lists" ${c.connected?'':'disabled'}>Choose task lists</button></div>
     ${!c.available?'<p class="mu">Check the connection first. Setup is enabled only when the shared connection service is available.</p>':''}<p class="mu">${S.status.sharedTasks && !S.status.sharedTasks.ok ? esc(S.status.sharedTasks.message) : S.sharedTasks ? 'Tasks last updated '+esc(sharedTime(S.sharedTasks.at)) : ''}</p></div></details>`;
 }
 async function sharedConnectionCheck() {
@@ -2247,6 +2256,23 @@ function connectSharedGoogle() {
 async function chooseSharedList() {
   try {
     const out=await api('/api/shared-tasks/lists');
+    const main=S.sharedConnection?.list?.id, extra=new Set((S.sharedConnection?.extraLists||[]).map(x=>x.id));
+    openSheet(`<h2>Shared task lists</h2><p class="muted">Lists in anaymatti@gmail.com. Ticked lists show in MyDay, each as its own collapsed section. Your wife sees every list in Google Tasks.</p>${out.lists.map(x=>`<label class="tick"><input type="checkbox" data-lid="${esc(x.id)}" ${x.id===main?'checked disabled':extra.has(x.id)?'checked':''}> <span>${esc(x.title)}${x.id===main?' <span class="mu">· main list, always shown</span>':''}</span></label>`).join('')}<div class="row" style="flex-wrap:wrap;margin-top:12px"><button class="btn" id="sharedListNew">+ New list</button><button class="btn day" id="sharedListSave">Save</button><button class="btn" id="sharedListCancel">Cancel</button></div><button class="btn" style="margin-top:14px" id="sharedMainChange">Change main list</button>`);
+    $('sharedListCancel').onclick=closeSheet;$('sharedMainChange').onclick=()=>chooseMainList();$('sharedListNew').onclick=newSharedList;
+    $('sharedListSave').onclick=async()=>{const button=$('sharedListSave');button.disabled=true;try{const ids=[...document.querySelectorAll('#overlay input[data-lid]:checked:not(:disabled)')].map(i=>i.dataset.lid);const r=await post('/api/shared-tasks/extras',{listIds:ids});S.sharedConnection.extraLists=r.extraLists;save();closeSheet();await loadDay(viewDate);toast('Shared lists updated');}catch(e){button.disabled=false;toast(e.message);}};
+  } catch(e){toast(e.message);}
+}
+function newSharedList() {
+  openSheet(`<h2>New shared list</h2><p class="muted">Creates a list in anaymatti@gmail.com. It also appears in Google Tasks for your wife. MyDay can't rename or delete lists.</p><input class="field" id="nlName" placeholder="List name" maxlength="100"><div class="row" style="flex-wrap:wrap;margin-top:14px"><button class="btn day" id="nlCreate" disabled>Create list</button><button class="btn" id="nlCancel">Cancel</button></div>`);
+  const input=$('nlName'),btn=$('nlCreate');
+  input.oninput=()=>{const v=input.value.trim();btn.disabled=!v;btn.textContent=v?'Create list "'+v+'"':'Create list';};
+  $('nlCancel').onclick=()=>chooseSharedList();
+  btn.onclick=async()=>{const v=input.value.trim();if(!v)return;btn.disabled=true;try{const r=await post('/api/shared-tasks/create-list',{title:v});S.sharedConnection.extraLists=r.extraLists;save();closeSheet();await loadDay(viewDate);toast('List "'+r.list.title+'" created');}catch(e){btn.disabled=false;toast(e.message);}};
+  input.focus();
+}
+async function chooseMainList() {
+  try {
+    const out=await api('/api/shared-tasks/lists');
     openSheet(`<h2>Shared task list</h2><p class="muted">Existing lists in anaymatti@gmail.com. Choosing one makes its tasks visible here. No new list is created.</p>${out.lists.length ? `<select class="field" id="sharedListChoice">${out.lists.map(x=>`<option value="${esc(x.id)}" ${S.sharedConnection?.list?.id===x.id?'selected':''}>${esc(x.title)}</option>`).join('')}</select><button class="btn day" style="margin-top:14px" id="sharedListSave">Use this shared list</button>`:'<p>No task lists were returned. Create a list in Google Tasks first, then refresh here.</p>'}<button class="btn" style="margin-top:14px" id="sharedListCancel">Cancel</button>`);
     $('sharedListCancel').onclick=closeSheet;
     if($('sharedListSave'))$('sharedListSave').onclick=async()=>{const button=$('sharedListSave');button.disabled=true;try{const chosen=await post('/api/shared-tasks/select',{listId:$('sharedListChoice').value});S.sharedConnection.list=chosen.list;S.sharedTasks=null;save();closeSheet();await loadDay(viewDate);toast('Shared list selected');}catch(e){button.disabled=false;toast(e.message);}};
@@ -2261,9 +2287,12 @@ async function toggleSharedTask(task) {
   try {
     const result=await post('/api/shared-tasks/'+action,{upstreamId:task.upstreamId,listId:task.listId,etag:task.etag});
     const updated=result.task;
+    const extra=sharedExtras().find(x=>x.list.id===task.listId);
+    if(extra){extra.open=extra.open.filter(t=>t.id!==task.id);if(updated.status!=='Done')extra.open.push(updated);}
+    else{
     S.sharedTasks.open=S.sharedTasks.open.filter(t=>t.id!==task.id);
     for(const d of Object.keys(S.sharedTasks.doneOn))S.sharedTasks.doneOn[d]=S.sharedTasks.doneOn[d].filter(t=>t.id!==task.id);
-    if(updated.status==='Done'){const d=updated.done||today();(S.sharedTasks.doneOn[d]||=([])).push(updated);}else S.sharedTasks.open.push(updated);
+    if(updated.status==='Done'){const d=updated.done||today();(S.sharedTasks.doneOn[d]||=([])).push(updated);}else S.sharedTasks.open.push(updated);}
     S.sharedTasks.at=Date.now();save();toast(action==='done'?'Shared task completed':'Shared task reopened');
   } catch(e){S.status.sharedTasks={ok:false,at:Date.now(),message:e.message};save();toast('Could not confirm the shared task update. Refresh before retrying: '+e.message);}
   finally{sharedPendingTasks.delete(task.id);render();}
@@ -2278,6 +2307,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(
   if(a==='shared-check')sharedConnectionCheck();
   if(a==='shared-connect')connectSharedGoogle();
   if(a==='shared-lists')chooseSharedList();
+  if(a==='add-task-list')openAddTask({list:b.dataset.lid});
 });
 
 /* ---------- boot ---------- */
